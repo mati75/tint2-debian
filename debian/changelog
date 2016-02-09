@@ -1,6 +1,7 @@
 tint2 (0.12.7-1) UNRELEASED; urgency=medium
 
   * New upstream release
+  * Update Debian Standards Version to 3.9.7
 
  -- Sebastian Reichel <sre@debian.org>  Wed, 10 Feb 2016 00:15:02 +0100
 
