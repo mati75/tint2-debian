@@ -1,9 +1,10 @@
-tint2 (0.12.7-1) UNRELEASED; urgency=medium
+tint2 (0.12.7-1) unstable; urgency=medium
 
   * New upstream release
   * Update Debian Standards Version to 3.9.7
+  * Drop -dbg package (Debian will build -dbgsym package automatically)
 
- -- Sebastian Reichel <sre@debian.org>  Wed, 10 Feb 2016 00:15:02 +0100
+ -- Sebastian Reichel <sre@debian.org>  Wed, 10 Feb 2016 00:42:23 +0100
 
 tint2 (0.12.3-1) unstable; urgency=low
 
