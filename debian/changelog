@@ -1,6 +1,7 @@
 tint2 (0.12.7-2) unstable; urgency=medium
 
   * Add upstream patch to fix build on ppc
+  * Use https:// vcs urls
 
  -- Sebastian Reichel <sre@debian.org>  Mon, 22 Feb 2016 03:23:51 +0100
 
