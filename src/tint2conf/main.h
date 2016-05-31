@@ -17,3 +17,5 @@
 #define SNAPSHOT_TICK 190
 gboolean update_snapshot();
 void menuApply();
+void refresh_current_theme();
+extern GtkWidget *g_window;

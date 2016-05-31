@@ -22,6 +22,7 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/extensions/Xrender.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,9 +37,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
-#include <sys/resource.h>
 #include <errno.h>
-#include <sys/sysctl.h>
 #include <dirent.h>
 
 #ifdef HAVE_RSVG
@@ -114,7 +113,7 @@ void tint_exec(const char *command)
 	}
 }
 
-char *expand_tilde(char *s)
+char *expand_tilde(const char *s)
 {
 	const gchar *home = g_get_home_dir();
 	if (home && (strcmp(s, "~") == 0 || strstr(s, "~/") == s)) {
@@ -127,7 +126,7 @@ char *expand_tilde(char *s)
 	}
 }
 
-char *contract_tilde(char *s)
+char *contract_tilde(const char *s)
 {
 	const gchar *home = g_get_home_dir();
 	if (!home)
@@ -239,119 +238,110 @@ void extract_values(const char *value, char **value1, char **value2, char **valu
 	}
 }
 
-void adjust_asb(DATA32 *data, int w, int h, int alpha, float satur, float bright)
+void adjust_asb(DATA32 *data, int w, int h, float alpha_adjust, float satur_adjust, float bright_adjust)
 {
-	unsigned int x, y;
-	unsigned int a, r, g, b, argb;
-	unsigned long id;
-	int cmax, cmin;
-	float h2, f, p, q, t;
-	float hue, saturation, brightness;
-	float redc, greenc, bluec;
+	for (int id = 0; id < w * h; id++) {
+		unsigned int argb = data[id];
+		int a = (argb >> 24) & 0xff;
+		// transparent => nothing to do.
+		if (a == 0)
+			continue;
+		int r = (argb >> 16) & 0xff;
+		int g = (argb >> 8) & 0xff;
+		int b = (argb)&0xff;
 
-	for (y = 0; y < h; y++) {
-		for (id = y * w, x = 0; x < w; x++, id++) {
-			argb = data[id];
-			a = (argb >> 24) & 0xff;
-			// transparent => nothing to do.
-			if (a == 0)
-				continue;
-			r = (argb >> 16) & 0xff;
-			g = (argb >> 8) & 0xff;
-			b = (argb)&0xff;
-
-			// convert RGB to HSB
-			cmax = (r > g) ? r : g;
-			if (b > cmax)
-				cmax = b;
-			cmin = (r < g) ? r : g;
-			if (b < cmin)
-				cmin = b;
-			brightness = ((float)cmax) / 255.0f;
-			if (cmax != 0)
-				saturation = ((float)(cmax - cmin)) / ((float)cmax);
+		// Convert RGB to HSV
+		int cmax = MAX3(r, g, b);
+		int cmin = MIN3(r, g, b);
+		int delta = cmax - cmin;
+		float brightness = cmax / 255.0f;
+		float saturation;
+		if (cmax != 0)
+			saturation = delta / (float)cmax;
+		else
+			saturation = 0;
+		float hue;
+		if (saturation == 0) {
+			hue = 0;
+		} else {
+			float redc = (cmax - r) / (float)delta;
+			float greenc = (cmax - g) / (float)delta;
+			float bluec = (cmax - b) / (float)delta;
+			if (r == cmax)
+				hue = bluec - greenc;
+			else if (g == cmax)
+				hue = 2.0f + redc - bluec;
 			else
-				saturation = 0;
-			if (saturation == 0)
-				hue = 0;
-			else {
-				redc = ((float)(cmax - r)) / ((float)(cmax - cmin));
-				greenc = ((float)(cmax - g)) / ((float)(cmax - cmin));
-				bluec = ((float)(cmax - b)) / ((float)(cmax - cmin));
-				if (r == cmax)
-					hue = bluec - greenc;
-				else if (g == cmax)
-					hue = 2.0f + redc - bluec;
-				else
-					hue = 4.0f + greenc - redc;
-				hue = hue / 6.0f;
-				if (hue < 0)
-					hue = hue + 1.0f;
-			}
-
-			// adjust
-			saturation += satur;
-			if (saturation < 0.0)
-				saturation = 0.0;
-			if (saturation > 1.0)
-				saturation = 1.0;
-			brightness += bright;
-			if (brightness < 0.0)
-				brightness = 0.0;
-			if (brightness > 1.0)
-				brightness = 1.0;
-			if (alpha != 100)
-				a = (a * alpha) / 100;
-
-			// convert HSB to RGB
-			if (saturation == 0) {
-				r = g = b = (int)(brightness * 255.0f + 0.5f);
-			} else {
-				h2 = (hue - (int)hue) * 6.0f;
-				f = h2 - (int)(h2);
-				p = brightness * (1.0f - saturation);
-				q = brightness * (1.0f - saturation * f);
-				t = brightness * (1.0f - (saturation * (1.0f - f)));
-				switch ((int)h2) {
-				case 0:
-					r = (int)(brightness * 255.0f + 0.5f);
-					g = (int)(t * 255.0f + 0.5f);
-					b = (int)(p * 255.0f + 0.5f);
-					break;
-				case 1:
-					r = (int)(q * 255.0f + 0.5f);
-					g = (int)(brightness * 255.0f + 0.5f);
-					b = (int)(p * 255.0f + 0.5f);
-					break;
-				case 2:
-					r = (int)(p * 255.0f + 0.5f);
-					g = (int)(brightness * 255.0f + 0.5f);
-					b = (int)(t * 255.0f + 0.5f);
-					break;
-				case 3:
-					r = (int)(p * 255.0f + 0.5f);
-					g = (int)(q * 255.0f + 0.5f);
-					b = (int)(brightness * 255.0f + 0.5f);
-					break;
-				case 4:
-					r = (int)(t * 255.0f + 0.5f);
-					g = (int)(p * 255.0f + 0.5f);
-					b = (int)(brightness * 255.0f + 0.5f);
-					break;
-				case 5:
-					r = (int)(brightness * 255.0f + 0.5f);
-					g = (int)(p * 255.0f + 0.5f);
-					b = (int)(q * 255.0f + 0.5f);
-					break;
-				}
-			}
-
-			argb = a;
-			argb = (argb << 8) + r;
-			argb = (argb << 8) + g;
-			argb = (argb << 8) + b;
-			data[id] = argb;
+				hue = 4.0f + greenc - redc;
+			hue = hue / 6.0f;
+			if (hue < 0)
+				hue = hue + 1.0f;
 		}
+
+		// Adjust H, S
+		saturation += satur_adjust;
+		saturation = CLAMP(saturation, 0.0, 1.0);
+
+		a *= alpha_adjust;
+		a = CLAMP(a, 0, 255);
+
+		// Convert HSV to RGB
+		if (saturation == 0) {
+			r = g = b = (int)(brightness * 255.0f + 0.5f);
+		} else {
+			float h2 = (hue - (int)hue) * 6.0f;
+			float f = h2 - (int)(h2);
+			float p = brightness * (1.0f - saturation);
+			float q = brightness * (1.0f - saturation * f);
+			float t = brightness * (1.0f - (saturation * (1.0f - f)));
+
+			switch ((int)h2) {
+			case 0:
+				r = (int)(brightness * 255.0f + 0.5f);
+				g = (int)(t * 255.0f + 0.5f);
+				b = (int)(p * 255.0f + 0.5f);
+				break;
+			case 1:
+				r = (int)(q * 255.0f + 0.5f);
+				g = (int)(brightness * 255.0f + 0.5f);
+				b = (int)(p * 255.0f + 0.5f);
+				break;
+			case 2:
+				r = (int)(p * 255.0f + 0.5f);
+				g = (int)(brightness * 255.0f + 0.5f);
+				b = (int)(t * 255.0f + 0.5f);
+				break;
+			case 3:
+				r = (int)(p * 255.0f + 0.5f);
+				g = (int)(q * 255.0f + 0.5f);
+				b = (int)(brightness * 255.0f + 0.5f);
+				break;
+			case 4:
+				r = (int)(t * 255.0f + 0.5f);
+				g = (int)(p * 255.0f + 0.5f);
+				b = (int)(brightness * 255.0f + 0.5f);
+				break;
+			case 5:
+				r = (int)(brightness * 255.0f + 0.5f);
+				g = (int)(p * 255.0f + 0.5f);
+				b = (int)(q * 255.0f + 0.5f);
+				break;
+			}
+		}
+
+		r += bright_adjust * 255;
+		g += bright_adjust * 255;
+		b += bright_adjust * 255;
+
+		r = CLAMP(r, 0, 255);
+		g = CLAMP(g, 0, 255);
+		b = CLAMP(b, 0, 255);
+
+		argb = a;
+		argb = (argb << 8) + r;
+		argb = (argb << 8) + g;
+		argb = (argb << 8) + b;
+		data[id] = argb;
 	}
 }
 
@@ -381,41 +371,6 @@ void create_heuristic_mask(DATA32 *data, int w, int h)
 	}
 }
 
-int pixel_empty(DATA32 argb)
-{
-
-	DATA32 a = (argb >> 24) & 0xff;
-	if (a == 0)
-		return 1;
-
-	DATA32 rgb = argb & 0xffFFff;
-	return rgb == 0;
-}
-
-int image_empty(DATA32 *data, int w, int h)
-{
-	if (w > 0 && h > 0) {
-		int x = w / 2;
-		int y = h / 2;
-		if (!pixel_empty(data[y * w + x])) {
-			// fprintf(stderr, "Non-empty pixel: [%u, %u] = %x\n", x, y, data[y * w + x]);
-			return 0;
-		}
-	}
-
-	for (int y = 0; y < h; y++) {
-		for (int x = 0; x < w; x++) {
-			if (!pixel_empty(data[y * w + x])) {
-				// fprintf(stderr, "Non-empty pixel: [%u, %u] = %x\n", x, y, data[y * w + x]);
-				return 0;
-			}
-		}
-	}
-
-	// fprintf(stderr, "All pixels are empty\n");
-	return 1;
-}
-
 void render_image(Drawable d, int x, int y)
 {
 	if (!server.real_transparency) {
@@ -437,9 +392,15 @@ void render_image(Drawable d, int x, int y)
 	imlib_context_set_blend(0);
 	imlib_render_image_on_drawable(0, 0);
 
-	Picture pict = XRenderCreatePicture(server.display, pixmap, XRenderFindStandardFormat(server.display, PictStandardARGB32), 0, 0);
-	Picture pict_drawable = XRenderCreatePicture(server.display, d, XRenderFindVisualFormat(server.display, server.visual), 0, 0);
-	Picture pict_mask =	XRenderCreatePicture(server.display, mask, XRenderFindStandardFormat(server.display, PictStandardARGB32), 0, 0);
+	Picture pict = XRenderCreatePicture(server.display,
+										pixmap,
+										XRenderFindStandardFormat(server.display, PictStandardARGB32),
+										0,
+										0);
+	Picture pict_drawable =
+		XRenderCreatePicture(server.display, d, XRenderFindVisualFormat(server.display, server.visual), 0, 0);
+	Picture pict_mask =
+		XRenderCreatePicture(server.display, mask, XRenderFindStandardFormat(server.display, PictStandardARGB32), 0, 0);
 	XRenderComposite(server.display, PictOpOver, pict, pict_mask, pict_drawable, 0, 0, 0, 0, x, y, w, h);
 
 	XRenderFreePicture(server.display, pict_mask);
@@ -462,8 +423,8 @@ void draw_text(PangoLayout *layout, cairo_t *c, int posx, int posy, Color *color
 									  0.0,
 									  0.0,
 									  1.0 -
-									  (1.0 - shadow_edge_alpha) *
-									  sqrt((i * i + j * j) / (double)(shadow_size * shadow_size)));
+										  (1.0 - shadow_edge_alpha) *
+											  sqrt((i * i + j * j) / (double)(shadow_size * shadow_size)));
 				pango_cairo_update_layout(c, layout);
 				cairo_move_to(c, posx + i, posy + j);
 				pango_cairo_show_layout(c, layout);
@@ -486,31 +447,31 @@ Imlib_Image load_image(const char *path, int cached)
 		image = imlib_load_image_immediately_without_cache(path);
 	}
 	if (!image && g_str_has_suffix(path, ".svg")) {
-		char suffix[128];
-		sprintf(suffix, "tmpimage-%d.png", getpid());
-		// We fork here because librsvg allocates memory like crazy
-		pid_t pid = fork();
-		if (pid == 0) {
-			// Child
-			GError *err = NULL;
-			RsvgHandle *svg = rsvg_handle_new_from_file(path, &err);
+		char tmp_filename[128];
+		sprintf(tmp_filename, "/tmp/tint2-%d-XXXXXX.png", (int)getpid());
+		int fd = mkstemps(tmp_filename, 4);
+		if (fd) {
+			// We fork here because librsvg allocates memory like crazy
+			pid_t pid = fork();
+			if (pid == 0) {
+				// Child
+				GError *err = NULL;
+				RsvgHandle *svg = rsvg_handle_new_from_file(path, &err);
 
-			if (err != NULL) {
-				fprintf(stderr, "Could not load svg image!: %s", err->message);
-				g_error_free(err);
+				if (err != NULL) {
+					fprintf(stderr, "Could not load svg image!: %s", err->message);
+					g_error_free(err);
+				} else {
+					GdkPixbuf *pixbuf = rsvg_handle_get_pixbuf(svg);
+					gdk_pixbuf_save(pixbuf, tmp_filename, "png", NULL, NULL);
+				}
+				exit(0);
 			} else {
-				gchar *name = g_build_filename(g_get_user_config_dir(), "tint2", suffix, NULL);
-				GdkPixbuf *pixbuf = rsvg_handle_get_pixbuf(svg);
-				gdk_pixbuf_save(pixbuf, name, "png", NULL, NULL);
+				// Parent
+				waitpid(pid, 0, 0);
+				image = imlib_load_image_immediately_without_cache(tmp_filename);
+				unlink(tmp_filename);
 			}
-			exit(0);
-		} else {
-			// Parent
-			waitpid(pid, 0, 0);
-			gchar *name = g_build_filename(g_get_user_config_dir(), "tint2", suffix, NULL);
-			image = imlib_load_image_immediately_without_cache(name);
-			g_remove(name);
-			g_free(name);
 		}
 	} else
 #endif
@@ -538,9 +499,9 @@ Imlib_Image adjust_icon(Imlib_Image original, int alpha, int saturation, int bri
 	adjust_asb(data,
 			   imlib_image_get_width(),
 			   imlib_image_get_height(),
-			   alpha,
-			   (float)saturation / 100,
-			   (float)brightness / 100);
+			   alpha / 100.0,
+			   saturation / 100.0,
+			   brightness / 100.0);
 	imlib_image_put_back_data(data);
 	return copy;
 }
@@ -565,7 +526,8 @@ void draw_rect(cairo_t *c, double x, double y, double w, double h, double r)
 
 void clear_pixmap(Pixmap p, int x, int y, int w, int h)
 {
-	Picture pict = XRenderCreatePicture(server.display, p, XRenderFindVisualFormat(server.display, server.visual), 0, 0);
+	Picture pict =
+		XRenderCreatePicture(server.display, p, XRenderFindVisualFormat(server.display, server.visual), 0, 0);
 	XRenderColor col;
 	col.red = col.green = col.blue = col.alpha = 0;
 	XRenderFillRectangle(server.display, PictOpSrc, pict, &col, x, y, w, h);
@@ -614,7 +576,7 @@ void get_text_size2(PangoFontDescription *font,
 	XFreePixmap(server.display, pmap);
 }
 
-#if !GLIB_CHECK_VERSION (2, 33, 4)
+#if !GLIB_CHECK_VERSION(2, 33, 4)
 GList *g_list_copy_deep(GList *list, GCopyFunc func, gpointer user_data)
 {
 	list = g_list_copy(list);
@@ -629,111 +591,44 @@ GList *g_list_copy_deep(GList *list, GCopyFunc func, gpointer user_data)
 }
 #endif
 
-// Based loosely on close_allv from
-// https://git.gnome.org/browse/glib/tree/gio/libasyncns/asyncns.c?h=2.21.0#n205
-// license: LGPL version 2.1
-// but with all the junk removed
-// and
-// https://opensource.apple.com/source/sudo/sudo-46/src/closefrom.c
-// license: BSD
-void close_all_fds()
+GSList *load_locations_from_env(GSList *locations, const char *var, ...)
 {
-	const int from_fd = 3;
-
-#ifdef __linux__
-	DIR *d = opendir("/proc/self/fd");
-	if (d) {
-		for (struct dirent *de = readdir(d); de; de = readdir(d)) {
-			if (de->d_name[0] == '.')
-				continue;
-			int fd = atoi(de->d_name);
-			if (fd < from_fd)
-				continue;
-			if (fd == dirfd(d))
-				continue;
-			close(fd);
+	char *value = getenv(var);
+	if (value) {
+		value = strdup(value);
+		char *p = value;
+		for (char *token = strsep(&value, ":"); token; token = strsep(&value, ":")) {
+			va_list ap;
+			va_start(ap, var);
+			for (const char *suffix = va_arg(ap, const char *); suffix; suffix = va_arg(ap, const char *)) {
+				locations = g_slist_append(locations, g_build_filename(token, suffix, NULL));
+			}
+			va_end(ap);
 		}
-		closedir(d);
-		return;
+		free(p);
 	}
-#endif
-
-#if defined(__FreeBSD__) || defined(__DragonFly__) || defined(__OpenBSD__)
-	closefrom(from_fd);
-	return;
-#endif
-
-#if defined(__NetBSD__)
-	fcntl(from_fd, F_CLOSEM, 0);
-#endif
-
-	// Worst case scenario: iterate over all possible fds
-	int max_fd = sysconf(_SC_OPEN_MAX);
-	for (int fd = from_fd; fd < max_fd; fd++) {
-		close(fd);
-	}
-
-	return;
+	return locations;
 }
 
-char* get_own_path()
+GSList *slist_remove_duplicates(GSList *list, GCompareFunc eq, GDestroyNotify fr)
 {
-	const int buf_size = 4096;
-	char *buf = calloc(buf_size, 1);
+	GSList *new_list = NULL;
 
-#ifdef __linux__
-	if (readlink("/proc/self/exe", buf, buf_size) > 0)
-		return buf;
-#endif
-
-#if defined(__FreeBSD__)
-	int mib[4] = {
-		CTL_KERN,
-		KERN_PROC,
-		KERN_PROC_PATHNAME,
-		getpid()
-	};
-
-	size_t max_len = buf_size;
-	if (sysctl(mib, 4, buf, &max_len, NULL, 0) == 0)
-		return buf;
-#endif
-
-#if defined(__DragonFly__)
-	if (readlink("/proc/curproc/file", buf, buf_size) > 0)
-		return buf;
-#endif
-
-#if defined(__NetBSD__)
-	if (readlink("/proc/curproc/exe", buf, buf_size) > 0)
-		return buf;
-#endif
-
-#if defined(__OpenBSD__)
-	int mib[4] = {
-		CTL_KERN,
-		KERN_PROC_ARGS,
-		getpid(),
-		KERN_PROC_ARGV
-	};
-
-	char *path = NULL;
-	size_t len;
-	if (sysctl(mib, 4, NULL, &len, NULL, 0) == 0 && len > 0) {
-		char **argv = malloc(len);
-		if (argv) {
-			if (sysctl(mib, 4, argv, &len, NULL, 0) == 0) {
-				path = realpath(argv[0], NULL);
+	for (GSList *l1 = list; l1; l1 = g_slist_next(l1)) {
+		gboolean duplicate = FALSE;
+		for (GSList *l2 = new_list; l2; l2 = g_slist_next(l2)) {
+			if (eq(l1->data, l2->data)) {
+				duplicate = TRUE;
+				break;
 			}
 		}
-		free(argv);
+		if (!duplicate) {
+			new_list = g_slist_append(new_list, l1->data);
+			l1->data = NULL;
+		}
 	}
-	if (path) {
-		free(buf);
-		return path;
-	}
-#endif
 
-	sprintf(buf, "tint2");
-	return buf;
+	g_slist_free_full(list, fr);
+
+	return new_list;
 }

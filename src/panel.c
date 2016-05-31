@@ -99,6 +99,7 @@ void default_panel()
 	backgrounds = g_array_new(0, 0, sizeof(Background));
 
 	memset(&panel_config, 0, sizeof(Panel));
+	snprintf(panel_config.area.name, sizeof(panel_config.area.name), "Panel");
 	panel_config.mouse_over_alpha = 100;
 	panel_config.mouse_over_saturation = 0;
 	panel_config.mouse_over_brightness = 10;
@@ -196,6 +197,7 @@ void init_panel()
 			p->area.bg = &g_array_index(backgrounds, Background, 0);
 		p->area.parent = p;
 		p->area.panel = p;
+		snprintf(p->area.name, sizeof(p->area.name), "Panel %d", i);
 		p->area.on_screen = TRUE;
 		p->area.resize_needed = 1;
 		p->area.size_mode = LAYOUT_DYNAMIC;
@@ -241,13 +243,16 @@ void init_panel()
 									mask,
 									&att);
 
-		long event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | ButtonMotionMask;
+		long event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | ButtonMotionMask | PropertyChangeMask;
 		if (p->mouse_effects || p->g_task.tooltip_enabled || p->clock.area._get_tooltip_text ||
 			(launcher_enabled && launcher_tooltip_enabled))
 			event_mask |= PointerMotionMask | LeaveWindowMask;
 		if (panel_autohide)
 			event_mask |= LeaveWindowMask | EnterWindowMask;
-		XChangeWindowAttributes(server.display, p->main_win, CWEventMask, &(XSetWindowAttributes){.event_mask = event_mask});
+		XChangeWindowAttributes(server.display,
+								p->main_win,
+								CWEventMask,
+								&(XSetWindowAttributes){.event_mask = event_mask});
 
 		if (!server.gc) {
 			XGCValues gcv;
@@ -284,11 +289,9 @@ void init_panel_size_and_position(Panel *panel)
 			panel->area.height = 32;
 		}
 		if (panel->fractional_width)
-			panel->area.width = (float)server.monitors[panel->monitor].width * panel->area.width / 100;
+			panel->area.width = (server.monitors[panel->monitor].width - panel->marginx) * panel->area.width / 100;
 		if (panel->fractional_height)
-			panel->area.height = (float)server.monitors[panel->monitor].height * panel->area.height / 100;
-		if (panel->area.width + panel->marginx > server.monitors[panel->monitor].width)
-			panel->area.width = server.monitors[panel->monitor].width - panel->marginx;
+			panel->area.height = (server.monitors[panel->monitor].height - panel->marginy) * panel->area.height / 100;
 		if (panel->area.bg->border.radius > panel->area.height / 2) {
 			printf("panel_background_id rounded is too big... please fix your tint2rc\n");
 			g_array_append_val(backgrounds, *panel->area.bg);
@@ -306,17 +309,14 @@ void init_panel_size_and_position(Panel *panel)
 		}
 		int old_panel_height = panel->area.height;
 		if (panel->fractional_width)
-			panel->area.height = (float)server.monitors[panel->monitor].height * panel->area.width / 100;
+			panel->area.height = (server.monitors[panel->monitor].height - panel->marginy) * panel->area.width / 100;
 		else
 			panel->area.height = panel->area.width;
 
 		if (panel->fractional_height)
-			panel->area.width = (float)server.monitors[panel->monitor].width * old_panel_height / 100;
+			panel->area.width = (server.monitors[panel->monitor].width - panel->marginx) * old_panel_height / 100;
 		else
 			panel->area.width = old_panel_height;
-
-		if (panel->area.height + panel->marginy > server.monitors[panel->monitor].height)
-			panel->area.height = server.monitors[panel->monitor].height - panel->marginy;
 
 		if (panel->area.bg->border.radius > panel->area.width / 2) {
 			printf("panel_background_id rounded is too big... please fix your tint2rc\n");
@@ -326,17 +326,22 @@ void init_panel_size_and_position(Panel *panel)
 		}
 	}
 
+	if (panel->area.width + panel->marginx > server.monitors[panel->monitor].width)
+		panel->area.width = server.monitors[panel->monitor].width - panel->marginx;
+	if (panel->area.height + panel->marginy > server.monitors[panel->monitor].height)
+		panel->area.height = server.monitors[panel->monitor].height - panel->marginy;
+
 	// panel position determined here
 	if (panel_position & LEFT) {
 		panel->posx = server.monitors[panel->monitor].x + panel->marginx;
 	} else {
 		if (panel_position & RIGHT) {
-			panel->posx = server.monitors[panel->monitor].x + server.monitors[panel->monitor].width - panel->area.width -
-						  panel->marginx;
+			panel->posx = server.monitors[panel->monitor].x + server.monitors[panel->monitor].width -
+						  panel->area.width - panel->marginx;
 		} else {
 			if (panel_horizontal)
-				panel->posx =
-				server.monitors[panel->monitor].x + ((server.monitors[panel->monitor].width - panel->area.width) / 2);
+				panel->posx = server.monitors[panel->monitor].x +
+							  ((server.monitors[panel->monitor].width - panel->area.width) / 2);
 			else
 				panel->posx = server.monitors[panel->monitor].x + panel->marginx;
 		}
@@ -349,7 +354,7 @@ void init_panel_size_and_position(Panel *panel)
 						  panel->area.height - panel->marginy;
 		} else {
 			panel->posy =
-			server.monitors[panel->monitor].y + ((server.monitors[panel->monitor].height - panel->area.height) / 2);
+				server.monitors[panel->monitor].y + ((server.monitors[panel->monitor].height - panel->area.height) / 2);
 		}
 	}
 
@@ -564,10 +569,53 @@ void set_panel_items_order(Panel *p)
 			GList *item = g_list_nth(p->execp_list, i_execp);
 			i_execp++;
 			if (item)
-				p->area.children = g_list_append(p->area.children, (Area*)item->data);
+				p->area.children = g_list_append(p->area.children, (Area *)item->data);
 		}
 	}
 	initialize_positions(&p->area, 0);
+}
+
+void place_panel_all_desktops(Panel *p)
+{
+	long val = ALL_DESKTOPS;
+	XChangeProperty(server.display,
+					p->main_win,
+					server.atom._NET_WM_DESKTOP,
+					XA_CARDINAL,
+					32,
+					PropModeReplace,
+					(unsigned char *)&val,
+					1);
+
+	Atom state[4];
+	state[0] = server.atom._NET_WM_STATE_SKIP_PAGER;
+	state[1] = server.atom._NET_WM_STATE_SKIP_TASKBAR;
+	state[2] = server.atom._NET_WM_STATE_STICKY;
+	state[3] = panel_layer == BOTTOM_LAYER ? server.atom._NET_WM_STATE_BELOW : server.atom._NET_WM_STATE_ABOVE;
+	int num_atoms = panel_layer == NORMAL_LAYER ? 3 : 4;
+	XChangeProperty(server.display,
+					p->main_win,
+					server.atom._NET_WM_STATE,
+					XA_ATOM,
+					32,
+					PropModeReplace,
+					(unsigned char *)state,
+					num_atoms);
+}
+
+void replace_panel_all_desktops(Panel *p)
+{
+	XClientMessageEvent m;
+	memset(&m, 0, sizeof(m));
+	m.type = ClientMessage;
+	m.send_event = True;
+	m.display = server.display;
+	m.window = p->main_win;
+	m.message_type = server.atom._NET_WM_DESKTOP;
+	m.format = 32;
+	m.data.l[0] = ALL_DESKTOPS;
+	XSendEvent(server.display, server.root_win, False, SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *)&m);
+	XSync(server.display, False);
 }
 
 void set_panel_properties(Panel *p)
@@ -608,30 +656,7 @@ void set_panel_properties(Panel *p)
 					(unsigned char *)&val,
 					1);
 
-	val = ALL_DESKTOPS;
-	XChangeProperty(server.display,
-					p->main_win,
-					server.atom._NET_WM_DESKTOP,
-					XA_CARDINAL,
-					32,
-					PropModeReplace,
-					(unsigned char *)&val,
-					1);
-
-	Atom state[4];
-	state[0] = server.atom._NET_WM_STATE_SKIP_PAGER;
-	state[1] = server.atom._NET_WM_STATE_SKIP_TASKBAR;
-	state[2] = server.atom._NET_WM_STATE_STICKY;
-	state[3] = panel_layer == BOTTOM_LAYER ? server.atom._NET_WM_STATE_BELOW : server.atom._NET_WM_STATE_ABOVE;
-	int num_atoms = panel_layer == NORMAL_LAYER ? 3 : 4;
-	XChangeProperty(server.display,
-					p->main_win,
-					server.atom._NET_WM_STATE,
-					XA_ATOM,
-					32,
-					PropModeReplace,
-					(unsigned char *)state,
-					num_atoms);
+	place_panel_all_desktops(p);
 
 	XWMHints wmhints;
 	memset(&wmhints, 0, sizeof(wmhints));
@@ -740,18 +765,10 @@ Panel *get_panel(Window win)
 
 Taskbar *click_taskbar(Panel *panel, int x, int y)
 {
-	if (panel_horizontal) {
-		for (int i = 0; i < panel->num_desktops; i++) {
-			Taskbar *taskbar = &panel->taskbar[i];
-			if (taskbar->area.on_screen && x >= taskbar->area.posx && x <= (taskbar->area.posx + taskbar->area.width))
-				return taskbar;
-		}
-	} else {
-		for (int i = 0; i < panel->num_desktops; i++) {
-			Taskbar *taskbar = &panel->taskbar[i];
-			if (taskbar->area.on_screen && y >= taskbar->area.posy && y <= (taskbar->area.posy + taskbar->area.height))
-				return taskbar;
-		}
+	for (int i = 0; i < panel->num_desktops; i++) {
+		Taskbar *taskbar = &panel->taskbar[i];
+		if (area_is_under_mouse(taskbar, x, y))
+			return taskbar;
 	}
 	return NULL;
 }
@@ -760,25 +777,13 @@ Task *click_task(Panel *panel, int x, int y)
 {
 	Taskbar *taskbar = click_taskbar(panel, x, y);
 	if (taskbar) {
-		if (panel_horizontal) {
-			GList *l = taskbar->area.children;
-			if (taskbarname_enabled)
-				l = l->next;
-			for (; l; l = l->next) {
-				Task *task = (Task *)l->data;
-				if (task->area.on_screen && x >= task->area.posx && x <= (task->area.posx + task->area.width)) {
-					return task;
-				}
-			}
-		} else {
-			GList *l = taskbar->area.children;
-			if (taskbarname_enabled)
-				l = l->next;
-			for (; l; l = l->next) {
-				Task *task = (Task *)l->data;
-				if (task->area.on_screen && y >= task->area.posy && y <= (task->area.posy + task->area.height)) {
-					return task;
-				}
+		GList *l = taskbar->area.children;
+		if (taskbarname_enabled)
+			l = l->next;
+		for (; l; l = l->next) {
+			Task *task = (Task *)l->data;
+			if (area_is_under_mouse(task, x, y)) {
+				return task;
 			}
 		}
 	}
@@ -789,106 +794,51 @@ Launcher *click_launcher(Panel *panel, int x, int y)
 {
 	Launcher *launcher = &panel->launcher;
 
-	if (panel_horizontal) {
-		if (launcher->area.on_screen && x >= launcher->area.posx && x <= (launcher->area.posx + launcher->area.width))
-			return launcher;
-	} else {
-		if (launcher->area.on_screen && y >= launcher->area.posy && y <= (launcher->area.posy + launcher->area.height))
-			return launcher;
-	}
+	if (area_is_under_mouse(launcher, x, y))
+		return launcher;
+
 	return NULL;
 }
 
 LauncherIcon *click_launcher_icon(Panel *panel, int x, int y)
 {
 	Launcher *launcher = click_launcher(panel, x, y);
-
 	if (launcher) {
 		for (GSList *l = launcher->list_icons; l; l = l->next) {
 			LauncherIcon *icon = (LauncherIcon *)l->data;
-			if (x >= (launcher->area.posx + icon->x) && x <= (launcher->area.posx + icon->x + icon->icon_size) &&
-				y >= (launcher->area.posy + icon->y) && y <= (launcher->area.posy + icon->y + icon->icon_size)) {
+			if (area_is_under_mouse(icon, x, y))
 				return icon;
-			}
 		}
 	}
 	return NULL;
 }
 
-gboolean click_padding(Panel *panel, int x, int y)
-{
-	if (panel_horizontal) {
-		if (x < panel->area.paddingxlr || x > panel->area.width - panel->area.paddingxlr)
-			return TRUE;
-	} else {
-		if (y < panel->area.paddingxlr || y > panel->area.height - panel->area.paddingxlr)
-			return TRUE;
-	}
-	return FALSE;
-}
-
-int click_clock(Panel *panel, int x, int y)
+Clock *click_clock(Panel *panel, int x, int y)
 {
 	Clock *clock = &panel->clock;
-	if (panel_horizontal) {
-		if (clock->area.on_screen && x >= clock->area.posx && x <= (clock->area.posx + clock->area.width))
-			return TRUE;
-	} else {
-		if (clock->area.on_screen && y >= clock->area.posy && y <= (clock->area.posy + clock->area.height))
-			return TRUE;
-	}
-	return FALSE;
+	if (area_is_under_mouse(clock, x, y))
+		return clock;
+	return NULL;
 }
 
 #ifdef ENABLE_BATTERY
-int click_battery(Panel *panel, int x, int y)
+Battery *click_battery(Panel *panel, int x, int y)
 {
 	Battery *bat = &panel->battery;
-	if (panel_horizontal) {
-		if (bat->area.on_screen && x >= bat->area.posx && x <= (bat->area.posx + bat->area.width))
-			return TRUE;
-	} else {
-		if (bat->area.on_screen && y >= bat->area.posy && y <= (bat->area.posy + bat->area.height))
-			return TRUE;
-	}
-	return FALSE;
+	if (area_is_under_mouse(bat, x, y))
+		return bat;
+	return NULL;
 }
 #endif
 
 Execp *click_execp(Panel *panel, int x, int y)
 {
-	GList *l;
-	for (l = panel->execp_list; l; l = l->next) {
+	for (GList *l = panel->execp_list; l; l = l->next) {
 		Execp *execp = (Execp *)l->data;
-		if (panel_horizontal) {
-			if (execp->area.on_screen && x >= execp->area.posx && x <= (execp->area.posx + execp->area.width))
-				return execp;
-		} else {
-			if (execp->area.on_screen && y >= execp->area.posy && y <= (execp->area.posy + execp->area.height))
-				return execp;
-		}
+		if (area_is_under_mouse(execp, x, y))
+			return execp;
 	}
 	return NULL;
-}
-
-Area *click_area(Panel *panel, int x, int y)
-{
-	Area *result = &panel->area;
-	Area *new_result = result;
-	do {
-		result = new_result;
-		GList *it = result->children;
-		while (it) {
-			Area *a = (Area *)it->data;
-			if (a->on_screen && x >= a->posx && x <= (a->posx + a->width) && y >= a->posy &&
-				y <= (a->posy + a->height)) {
-				new_result = a;
-				break;
-			}
-			it = it->next;
-		}
-	} while (new_result != result);
-	return result;
 }
 
 void stop_autohide_timeout(Panel *p)

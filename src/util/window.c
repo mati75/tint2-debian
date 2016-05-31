@@ -108,24 +108,24 @@ gboolean window_is_hidden(Window win)
 
 int get_window_desktop(Window win)
 {
-	if (!server.viewports) {
-		int desktop = get_property32(win, server.atom._NET_WM_DESKTOP, XA_CARDINAL);
-		if (desktop != ALL_DESKTOPS)
-			desktop = MAX(0, MIN(server.num_desktops - 1, desktop));
+	int desktop = get_property32(win, server.atom._NET_WM_DESKTOP, XA_CARDINAL);
+	if (desktop == ALL_DESKTOPS)
 		return desktop;
-	}
+	if (!server.viewports)
+		return CLAMP(desktop, 0, server.num_desktops - 1);
 
 	int x, y, w, h;
 	get_window_coordinates(win, &x, &y, &w, &h);
 
-	int desktop = get_current_desktop();
+	desktop = get_current_desktop();
 	// Window coordinates are relative to the current viewport, make them absolute
 	x += server.viewports[desktop].x;
 	y += server.viewports[desktop].y;
 
 	if (x < 0 || y < 0) {
 		int num_results;
-		long *x_screen_size = server_get_property(server.root_win, server.atom._NET_DESKTOP_GEOMETRY, XA_CARDINAL, &num_results);
+		long *x_screen_size =
+			server_get_property(server.root_win, server.atom._NET_DESKTOP_GEOMETRY, XA_CARDINAL, &num_results);
 		if (!x_screen_size)
 			return 0;
 		int x_screen_width = x_screen_size[0];
@@ -157,7 +157,8 @@ int get_window_desktop(Window win)
 
 	if (best_match < 0)
 		best_match = 0;
-	//fprintf(stderr, "window %lx %s : viewport %d, (%d, %d)\n", win, get_task(win) ? get_task(win)->title : "??", best_match+1, x, y);
+	// fprintf(stderr, "window %lx %s : viewport %d, (%d, %d)\n", win, get_task(win) ? get_task(win)->title : "??",
+	// best_match+1, x, y);
 	return best_match;
 }
 
@@ -184,7 +185,8 @@ int get_window_monitor(Window win)
 
 	if (best_match < 0)
 		best_match = 0;
-	//fprintf(stderr, "desktop %d, window %lx %s : monitor %d, (%d, %d)\n", 1 + get_current_desktop(), win, get_task(win) ? get_task(win)->title : "??", best_match+1, x, y);
+	// fprintf(stderr, "desktop %d, window %lx %s : monitor %d, (%d, %d)\n", 1 + get_current_desktop(), win,
+	// get_task(win) ? get_task(win)->title : "??", best_match+1, x, y);
 	return best_match;
 }
 
@@ -317,4 +319,33 @@ gulong *get_best_icon(gulong *data, int icon_count, int num, int *iw, int *ih, i
 	*iw = width[icon_num];
 	*ih = height[icon_num];
 	return icon_data[icon_num];
+}
+
+// Thanks zcodes!
+char *get_window_name(Window win)
+{
+    XTextProperty text_property;
+    Status status = XGetWMName(server.display, win, &text_property);
+    if (!status || !text_property.value || !text_property.nitems) {
+        return strdup("");
+    }
+
+    char **name_list;
+    int count;
+    status = Xutf8TextPropertyToTextList(server.display, &text_property, &name_list, &count);
+    if (status < Success || !count) {
+        XFree(text_property.value);
+        return strdup("");
+    }
+
+    if (!name_list[0]) {
+        XFreeStringList(name_list);
+        XFree(text_property.value);
+        return strdup("");
+    }
+
+    char *result = strdup(name_list[0]);
+    XFreeStringList(name_list);
+    XFree(text_property.value);
+    return result;
 }

@@ -8,15 +8,19 @@
 
 #define WM_CLASS_TINT "panel"
 
+#include <glib.h>
 #include <Imlib2.h>
 #include <pango/pangocairo.h>
 #include "area.h"
 
-#define GREEN  "\033[1;32m"
+#define GREEN "\033[1;32m"
 #define YELLOW "\033[1;33m"
-#define RED    "\033[1;31m"
-#define BLUE   "\033[1;34m"
-#define RESET  "\033[0m"
+#define RED "\033[1;31m"
+#define BLUE "\033[1;34m"
+#define RESET "\033[0m"
+
+#define MAX3(a, b, c) MAX(MAX(a, b), c)
+#define MIN3(a, b, c) MIN(MIN(a, b), c)
 
 // mouse actions
 typedef enum MouseAction {
@@ -35,7 +39,7 @@ typedef enum MouseAction {
 	PREV_TASK
 } MouseAction;
 
-#define ALL_DESKTOPS  0xFFFFFFFF
+#define ALL_DESKTOPS 0xFFFFFFFF
 
 // Copies a file to another path
 void copy_file(const char *path_src, const char *path_dest);
@@ -53,11 +57,11 @@ void tint_exec(const char *command);
 
 // Returns a copy of s in which "~" is expanded to the path to the user's home directory.
 // The caller takes ownership of the string.
-char *expand_tilde(char *s);
+char *expand_tilde(const char *s);
 
 // The opposite of expand_tilde: replaces the path to the user's home directory with "~".
 // The caller takes ownership of the string.
-char *contract_tilde(char *s);
+char *contract_tilde(const char *s);
 
 // Color
 int hex_char_to_int(char c);
@@ -67,13 +71,23 @@ void get_color(char *hex, double *rgb);
 Imlib_Image load_image(const char *path, int cached);
 
 // Adjusts the alpha/saturation/brightness on an ARGB image.
-// Parameters: alpha from 0 to 100, satur from 0 to 1, bright from 0 to 1.
-void adjust_asb(DATA32 *data, int w, int h, int alpha, float satur, float bright);
+// Parameters:
+// * alpha_adjust: multiplicative:
+//    * 0 = full transparency
+//    * 1 = no adjustment
+//    * 2 = twice the current opacity
+// * satur_adjust: additive:
+//   * -1 = full grayscale
+//   *  0 = no adjustment
+//   *  1 = full color
+// * bright_adjust: additive:
+//   * -1 = black
+//   *  0 = no adjustment
+//   *  1 = white
+void adjust_asb(DATA32 *data, int w, int h, float alpha_adjust, float satur_adjust, float bright_adjust);
 Imlib_Image adjust_icon(Imlib_Image original, int alpha, int saturation, int brightness);
 
 void create_heuristic_mask(DATA32 *data, int w, int h);
-
-int image_empty(DATA32 *data, int w, int h);
 
 // Renders the current Imlib image to a drawable. Wrapper around imlib_render_image_on_drawable.
 void render_image(Drawable d, int x, int y);
@@ -98,18 +112,25 @@ void draw_rect(cairo_t *c, double x, double y, double w, double h, double r);
 // Clears the pixmap (with transparent color)
 void clear_pixmap(Pixmap p, int x, int y, int w, int h);
 
-#define free_and_null(p) { free(p); p = NULL; }
+// Appends to the list locations all the directories contained in the environment variable var (split by ":").
+// Optional suffixes are added to each directory. The suffix arguments MUST end with NULL.
+// Returns the new value of the list.
+GSList *load_locations_from_env(GSList *locations, const char *var, ...);
 
-#if !GLIB_CHECK_VERSION (2, 33, 4)
+GSList *slist_remove_duplicates(GSList *list, GCompareFunc eq, GDestroyNotify fr);
+
+#define free_and_null(p) \
+	{                    \
+		free(p);         \
+		p = NULL;        \
+	}
+
+#if !GLIB_CHECK_VERSION(2, 33, 4)
 GList *g_list_copy_deep(GList *list, GCopyFunc func, gpointer user_data);
 #endif
 
-#if !GLIB_CHECK_VERSION (2, 38, 0)
+#if !GLIB_CHECK_VERSION(2, 38, 0)
 #define g_assert_null(expr) g_assert((expr) == NULL)
 #endif
-
-void close_all_fds();
-
-char* get_own_path();
 
 #endif

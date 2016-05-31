@@ -304,13 +304,13 @@ void add_entry(char *key, char *value)
 		char *b;
 		if ((b = strchr(value1, '%'))) {
 			b[0] = '\0';
-			panel_config.fractional_width = 1;
+			panel_config.fractional_width = TRUE;
 		}
 		panel_config.area.width = atoi(value1);
 		if (panel_config.area.width == 0) {
 			// full width mode
 			panel_config.area.width = 100;
-			panel_config.fractional_width = 1;
+			panel_config.fractional_width = TRUE;
 		}
 		if (value2) {
 			if ((b = strchr(value2, '%'))) {
@@ -732,7 +732,7 @@ void add_entry(char *key, char *value)
 		panel_config.g_taskbar.background_name[TASKBAR_NORMAL] = &g_array_index(backgrounds, Background, id);
 		if (panel_config.g_taskbar.background_name[TASKBAR_ACTIVE] == 0)
 			panel_config.g_taskbar.background_name[TASKBAR_ACTIVE] =
-			panel_config.g_taskbar.background_name[TASKBAR_NORMAL];
+				panel_config.g_taskbar.background_name[TASKBAR_NORMAL];
 	} else if (strcmp(key, "taskbar_name_active_background_id") == 0) {
 		int id = atoi(value);
 		id = (id < backgrounds->len && id >= 0) ? id : 0;

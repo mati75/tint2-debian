@@ -156,12 +156,7 @@ typedef enum Alignment {
 	ALIGN_RIGHT = 2,
 } Alignment;
 
-typedef enum MouseState {
-	MOUSE_NORMAL = 0,
-	MOUSE_OVER = 1,
-	MOUSE_DOWN = 2,
-	MOUSE_STATE_COUNT
-} MouseState;
+typedef enum MouseState { MOUSE_NORMAL = 0, MOUSE_OVER = 1, MOUSE_DOWN = 2, MOUSE_STATE_COUNT } MouseState;
 
 struct Panel;
 
@@ -199,6 +194,7 @@ typedef struct Area {
 	// This is the pixmap on which the Area is rendered. Render to it directly if needed.
 	Pixmap pix;
 	Pixmap pix_by_state[MOUSE_STATE_COUNT];
+	char name[32];
 
 	// Callbacks
 
@@ -219,6 +215,10 @@ typedef struct Area {
 	// Returns a copy of the tooltip to be displayed for this widget.
 	// The caller takes ownership of the pointer.
 	char *(*_get_tooltip_text)(void *obj);
+
+	// Returns true if the Area handles a mouse event at the given x, y coordinates relative to the window.
+	// Leave this to NULL to use a default implementation.
+	gboolean (*_is_under_mouse)(void *obj, int x, int y);
 } Area;
 
 // Initializes the Background member to default values.
@@ -266,7 +266,20 @@ void add_area(Area *a, Area *parent);
 void remove_area(Area *a);
 void free_area(Area *a);
 
-// Mouse move events
+// Mouse events
+
+// Returns the area under the mouse for the given x, y mouse coordinates relative to the window.
+// If no area is found, returns the root.
+Area *find_area_under_mouse(void *root, int x, int y);
+
+// Returns true if the Area handles a mouse event at the given x, y coordinates relative to the window.
+gboolean area_is_under_mouse(void *obj, int x, int y);
+
+// Returns true if the Area handles a mouse event at the given x, y coordinates relative to the window.
+// The Area will also handle clicks on the border of its ancestors, including the panel.
+// Useful so that a click at the edge of the screen is still handled by task buttons etc., even if technically
+// they are outside the drawing area of the button.
+gboolean full_width_area_is_under_mouse(void *obj, int x, int y);
 
 void mouse_over(Area *area, int pressed);
 void mouse_out();

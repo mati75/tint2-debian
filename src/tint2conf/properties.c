@@ -17,6 +17,9 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **************************************************************************/
 
+#include <limits.h>
+#include <stdlib.h>
+
 #include "main.h"
 #include "properties.h"
 #include "properties_rw.h"
@@ -161,7 +164,7 @@ void current_background_changed(GtkWidget *widget, gpointer data);
 void background_combo_changed(GtkWidget *widget, gpointer data);
 void create_panel(GtkWidget *parent);
 void create_panel_items(GtkWidget *parent);
-void create_launcher(GtkWidget *parent);
+void create_launcher(GtkWidget *parent, GtkWindow *window);
 gchar *get_default_theme_name();
 void icon_theme_changed();
 void load_icons(GtkListStore *apps);
@@ -205,20 +208,20 @@ const gchar *get_default_font()
 
 void applyClicked(GtkWidget *widget, gpointer data)
 {
-	gchar *file = get_current_theme_file_name();
-	if (file) {
-		if (config_is_manual(file)) {
-			gchar *backup_path = g_strdup_printf("%s.backup.%ld", file, time(NULL));
-			copy_file(file, backup_path);
+	gchar *filepath = get_current_theme_path();
+	if (filepath) {
+		if (config_is_manual(filepath)) {
+			gchar *backup_path = g_strdup_printf("%s.backup.%ld", filepath, time(NULL));
+			copy_file(filepath, backup_path);
 			g_free(backup_path);
 		}
 
-		config_save_file(file);
+		config_save_file(filepath);
 	}
 	int unused = system("killall -SIGUSR1 tint2 || pkill -SIGUSR1 -x tint2");
 	(void)unused;
-	g_free(file);
-	g_timeout_add(SNAPSHOT_TICK, (GSourceFunc)update_snapshot, NULL);
+	g_free(filepath);
+	refresh_current_theme();
 }
 
 void cancelClicked(GtkWidget *widget, gpointer data)
@@ -333,7 +336,7 @@ GtkWidget *create_properties()
 	gtk_container_set_border_width(GTK_CONTAINER(page_launcher), 10);
 	gtk_widget_show(page_launcher);
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), addScrollBarToWidget(page_launcher), label);
-	create_launcher(page_launcher);
+	create_launcher(page_launcher, GTK_WINDOW(view));
 
 	label = gtk_label_new(_("Clock"));
 	gtk_widget_show(label);
@@ -732,6 +735,7 @@ void background_create_new()
 					   bgColBorderOpacity, borderOpacity,
 					   bgColBorderWidth, b,
 					   bgColCornerRadius, r,
+					   bgColText, "",
 					   bgColFillColorOver, &fillColorOver,
 					   bgColFillOpacityOver, fillOpacityOver,
 					   bgColBorderColorOver, &borderColorOver,
@@ -740,7 +744,6 @@ void background_create_new()
 					   bgColFillOpacityPress, fillOpacityPress,
 					   bgColBorderColorPress, &borderColorPress,
 					   bgColBorderOpacityPress, borderOpacityPress,
-					   bgColText, "",
 					   -1);
 
 	background_update_image(index);
@@ -802,6 +805,7 @@ void background_duplicate(GtkWidget *widget, gpointer data)
 					   bgColFillOpacity, fillOpacity,
 					   bgColBorderColor, borderColor,
 					   bgColBorderOpacity, borderOpacity,
+					   bgColText, "",
 					   bgColFillColorOver, fillColorOver,
 					   bgColFillOpacityOver, fillOpacityOver,
 					   bgColBorderColorOver, borderColorOver,
@@ -812,7 +816,6 @@ void background_duplicate(GtkWidget *widget, gpointer data)
 					   bgColBorderOpacityPress, borderOpacityPress,
 					   bgColBorderWidth, b,
 					   bgColCornerRadius, r,
-					   bgColText, ""
 					   -1);
 	g_boxed_free(GDK_TYPE_COLOR, fillColor);
 	g_boxed_free(GDK_TYPE_COLOR, borderColor);
@@ -2077,9 +2080,9 @@ void launcher_add_app(GtkWidget *widget, gpointer data)
 		gtk_list_store_append(launcher_apps, &iter);
 		gtk_list_store_set(launcher_apps, &iter,
 						   appsColIcon, pixbuf,
+						   appsColIconName, g_strdup(iconName),
 						   appsColText, g_strdup(name),
 						   appsColPath, g_strdup(path),
-						   appsColIconName, g_strdup(iconName),
 						   -1);
 		if (pixbuf)
 			g_object_unref(pixbuf);
@@ -2204,8 +2207,11 @@ void set_current_icon_theme(const char *theme)
 	}
 }
 
-void icon_theme_changed()
+void icon_theme_changed(gpointer data)
 {
+	create_please_wait(GTK_WINDOW(data));
+	process_events();
+
 	if (icon_theme)
 		free_themes(icon_theme);
 
@@ -2219,15 +2225,20 @@ void icon_theme_changed()
 
 	load_icons(launcher_apps);
 	load_icons(all_apps);
+	save_icon_cache(icon_theme);
+
+	destroy_please_wait();
 }
 
 void launcher_icon_theme_changed(GtkWidget *widget, gpointer data)
 {
-	icon_theme_changed();
+	icon_theme_changed(data);
 }
 
 GdkPixbuf *load_icon(const gchar *name)
 {
+	process_events();
+
 	int size = 22;
 	char *path = get_icon_path(icon_theme, name, size);
 	GdkPixbuf *pixbuf = path ? gdk_pixbuf_new_from_file_at_size(path, size, size, NULL) : NULL;
@@ -2265,46 +2276,92 @@ void load_icons(GtkListStore *apps)
 
 void load_desktop_file(const char *file, gboolean selected)
 {
-	DesktopEntry entry;
-	if (read_desktop_file(file, &entry)) {
-		GdkPixbuf *pixbuf = load_icon(entry.icon);
+	char *file_contracted = contract_tilde(file);
+
+	GtkListStore *store = selected ? launcher_apps : all_apps;
+	gboolean duplicate = FALSE;
+	for (int index = 0; ; index++) {
+		GtkTreePath *path = gtk_tree_path_new_from_indices(index, -1);
 		GtkTreeIter iter;
-		gtk_list_store_append(selected ? launcher_apps : all_apps, &iter);
-		gtk_list_store_set(selected ? launcher_apps :all_apps, &iter,
-						   appsColIcon, pixbuf,
-						   appsColText, g_strdup(entry.name),
-						   appsColPath, g_strdup(file),
-						   appsColIconName, g_strdup(entry.icon),
-						   -1);
-		if (pixbuf)
-			g_object_unref(pixbuf);
-	} else {
-		printf("Could not load %s\n", file);
-		GtkTreeIter iter;
-		gtk_list_store_append(selected ? launcher_apps : all_apps, &iter);
-		gtk_list_store_set(selected ? launcher_apps :all_apps, &iter,
-						   appsColIcon, NULL,
-						   appsColText, g_strdup(file),
-						   appsColPath, g_strdup(file),
-						   appsColIconName, g_strdup(""),
-						   -1);
+		gboolean found = gtk_tree_model_get_iter(GTK_TREE_MODEL(store), &iter, path);
+		gtk_tree_path_free(path);
+		if (!found)
+			break;
+
+		gchar *app_path;
+		gtk_tree_model_get(GTK_TREE_MODEL(store), &iter, appsColPath, &app_path, -1);
+		char *contracted = contract_tilde(app_path);
+		if (strcmp(contracted, file_contracted) == 0) {
+			duplicate = TRUE;
+			break;
+		}
+		free(contracted);
+		g_free(app_path);
 	}
-	free_desktop_entry(&entry);
+
+	if (!duplicate) {
+		DesktopEntry entry;
+		if (read_desktop_file(file, &entry)) {
+			int index;
+			gboolean stop = FALSE;
+			for (index = 0; !stop || selected; index++) {
+				GtkTreePath *path = gtk_tree_path_new_from_indices(index, -1);
+				GtkTreeIter iter;
+				gboolean found = gtk_tree_model_get_iter(GTK_TREE_MODEL(store), &iter, path);
+				gtk_tree_path_free(path);
+				if (!found)
+					break;
+
+				gchar *app_name;
+				gtk_tree_model_get(GTK_TREE_MODEL(store), &iter, appsColText, &app_name, -1);
+				if (strnatcasecmp(app_name, entry.name) >= 0)
+					stop = TRUE;
+				g_free(app_name);
+			}
+
+			GdkPixbuf *pixbuf = load_icon(entry.icon);
+			GtkTreeIter iter;
+			gtk_list_store_insert(store, &iter, index);
+			gtk_list_store_set(store, &iter,
+							   appsColIcon, pixbuf,
+							   appsColIconName, g_strdup(entry.icon),
+							   appsColText, g_strdup(entry.name),
+							   appsColPath, g_strdup(file),
+							   -1);
+			if (pixbuf)
+				g_object_unref(pixbuf);
+		} else {
+			printf("Could not load %s\n", file);
+			GdkPixbuf *pixbuf = load_icon(DEFAULT_ICON);
+			GtkTreeIter iter;
+			gtk_list_store_append(store, &iter);
+			gtk_list_store_set(store, &iter,
+							   appsColIcon, pixbuf,
+							   appsColIconName, g_strdup(""),
+							   appsColText, g_strdup(file),
+							   appsColPath, g_strdup(file),
+							   -1);
+			if (pixbuf)
+				g_object_unref(pixbuf);
+		}
+		free_desktop_entry(&entry);
+	}
+
+	free(file_contracted);
 }
 
 void populate_from_entries(GList *entries, gboolean selected)
 {
-	GList *l;
-	for (l = entries; l; l = l->next) {
+	for (GList *l = entries; l; l = l->next) {
 		DesktopEntry *entry = (DesktopEntry *)l->data;
 		GdkPixbuf *pixbuf = load_icon(entry->icon);
 		GtkTreeIter iter;
 		gtk_list_store_append(selected ? launcher_apps : all_apps, &iter);
 		gtk_list_store_set(selected ? launcher_apps :all_apps, &iter,
 						   appsColIcon, pixbuf,
+						   appsColIconName, g_strdup(entry->icon),
 						   appsColText, g_strdup(entry->name),
 						   appsColPath, g_strdup(entry->path),
-						   appsColIconName, g_strdup(entry->icon),
 						   -1);
 		if (pixbuf)
 			g_object_unref(pixbuf);
@@ -2318,9 +2375,15 @@ static gint compare_entries(gconstpointer a, gconstpointer b)
 
 void load_desktop_entry(const char *file, GList **entries)
 {
+	process_events();
+
 	DesktopEntry *entry = calloc(1, sizeof(DesktopEntry));
 	if (!read_desktop_file(file, entry))
 		printf("Could not load %s\n", file);
+	if (entry->hidden_from_menus) {
+		free(entry);
+		return;
+	}
 	if (!entry->name)
 		entry->name = strdup(file);
 	if (!entry->icon)
@@ -2330,6 +2393,8 @@ void load_desktop_entry(const char *file, GList **entries)
 
 void load_desktop_entries(const char *path, GList **entries)
 {
+	process_events();
+
 	GList *subdirs = NULL;
 	GList *files = NULL;
 
@@ -2367,9 +2432,19 @@ void load_desktop_entries(const char *path, GList **entries)
 	g_list_free(files);
 }
 
-void load_theme_file(const char *file_name, const char *theme)
+static gint compare_themes(gconstpointer a, gconstpointer b)
 {
-	if (!file_name || !theme) {
+	gint result = strnatcasecmp(((IconTheme*)a)->description, ((IconTheme*)b)->description);
+	if (result)
+		return result;
+	return strnatcasecmp(((IconTheme*)a)->name, ((IconTheme*)b)->name);
+}
+
+void load_theme_file(const char *file_name, const char *theme_name, GList **themes)
+{
+	process_events();
+
+	if (!file_name || !theme_name) {
 		return;
 	}
 
@@ -2397,13 +2472,11 @@ void load_theme_file(const char *file_name, const char *theme)
 
 		if (parse_theme_line(line, &key, &value)) {
 			if (strcmp(key, "Name") == 0) {
-				// value is like Tango
-				GtkTreeIter iter;
-				gtk_list_store_append(icon_themes, &iter);
-				gtk_list_store_set(icon_themes, &iter,
-								   iconsColName, g_strdup(theme),
-								   iconsColDescr, g_strdup(value),
-								   -1);
+				IconTheme *theme = calloc(1, sizeof(IconTheme));
+				theme->name = strdup(theme_name);
+				theme->description = strdup(value);
+				*themes = g_list_append(*themes, theme);
+				break;
 			}
 		}
 
@@ -2415,8 +2488,10 @@ void load_theme_file(const char *file_name, const char *theme)
 	free(line);
 }
 
-void load_icon_themes(const gchar *path, const gchar *parent)
+void load_icon_themes(const gchar *path, const gchar *parent, GList **themes)
 {
+	process_events();
+
 	GDir *d = g_dir_open(path, 0, NULL);
 	if (!d)
 		return;
@@ -2426,9 +2501,22 @@ void load_icon_themes(const gchar *path, const gchar *parent)
 		if (parent &&
 			g_file_test(file, G_FILE_TEST_IS_REGULAR) &&
 			g_str_equal(name, "index.theme")) {
-			load_theme_file(file, parent);
+			load_theme_file(file, parent, themes);
 		} else if (g_file_test(file, G_FILE_TEST_IS_DIR)) {
-			load_icon_themes(file, name);
+			gboolean duplicate = FALSE;
+			if (g_file_test(file, G_FILE_TEST_IS_SYMLINK)) {
+#ifdef PATH_MAX
+				char real_path[PATH_MAX];
+#else
+				char real_path[65536];
+#endif
+				if (realpath(file, real_path)) {
+					if (strstr(real_path, path) == real_path)
+						duplicate = TRUE;
+				}
+			}
+			if (!duplicate)
+				load_icon_themes(file, name, themes);
 		}
 		g_free(file);
 	}
@@ -2465,7 +2553,7 @@ GtkWidget *addScrollBarToWidget(GtkWidget *widget)
 	return scrolled_window;
 }
 
-void create_launcher(GtkWidget *parent)
+void create_launcher(GtkWidget *parent, GtkWindow *window)
 {
 	GtkWidget *image;
 	GtkTooltips *tooltips = gtk_tooltips_new();
@@ -2753,7 +2841,7 @@ void create_launcher(GtkWidget *parent)
 	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 	gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(launcher_icon_theme), renderer, FALSE);
 	gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(launcher_icon_theme), renderer, "text", iconsColDescr, NULL);
-	g_signal_connect(G_OBJECT(launcher_icon_theme), "changed", G_CALLBACK(launcher_icon_theme_changed), NULL);
+	g_signal_connect(G_OBJECT(launcher_icon_theme), "changed", G_CALLBACK(launcher_icon_theme_changed), window);
 	gtk_widget_show(launcher_icon_theme);
 	gtk_table_attach(GTK_TABLE(table), launcher_icon_theme, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
 	col++;
@@ -2796,38 +2884,51 @@ void create_launcher(GtkWidget *parent)
 
 	change_paragraph(parent);
 
+	fprintf(stderr, "Loading icon themes\n");
+	GList *themes = NULL;
+	const GSList *location;
+	for (location = get_icon_locations(); location; location = g_slist_next(location)) {
+		const gchar *path = (gchar*) location->data;
+		load_icon_themes(path, NULL, &themes);
+	}
+	themes = g_list_sort(themes, compare_themes);
+
 	GtkTreeIter iter;
 	gtk_list_store_append(icon_themes, &iter);
 	gtk_list_store_set(icon_themes, &iter,
 					   0, "",
 					   -1);
-
-	fprintf(stderr, "Loading icon themes\n");
-	const GSList *location;
-	for (location = get_icon_locations(); location; location = g_slist_next(location)) {
-		const gchar *path = (gchar*) location->data;
-		load_icon_themes(path, NULL);
+	for (GList *l = themes; l; l = l->next) {
+		IconTheme *theme = (IconTheme*)l->data;
+		GtkTreeIter iter;
+		gtk_list_store_append(icon_themes, &iter);
+		gtk_list_store_set(icon_themes, &iter,
+						   iconsColName, g_strdup(theme->name),
+						   iconsColDescr, g_strdup(theme->description),
+						   -1);
 	}
+
+	for (GList *l = themes; l; l = l->next) {
+		free_icon_theme((IconTheme*)l->data);
+	}
+	g_list_free(themes);
 	fprintf(stderr, "Icon themes loaded\n");
 
 	fprintf(stderr, "Loading .desktop files\n");
 	GList *entries = NULL;
-	load_desktop_entries("/usr/share/applications", &entries);
-	load_desktop_entries("/usr/local/share/applications", &entries);
-	gchar *path = g_build_filename(g_get_home_dir(), ".local/share/applications", NULL);
-	load_desktop_entries(path, &entries);
+	for (location = get_apps_locations(); location; location = g_slist_next(location)) {
+		const gchar *path = (gchar*) location->data;
+		load_desktop_entries(path, &entries);
+	}
 	entries = g_list_sort(entries, compare_entries);
 	populate_from_entries(entries, FALSE);
 
-	GList *l;
-	for (l = entries; l; l = l->next) {
+	for (GList *l = entries; l; l = l->next) {
 		free_desktop_entry((DesktopEntry*)l->data);
 	}
 	g_list_free(entries);
 
-	g_free(path);
-
-	icon_theme_changed();
+	icon_theme_changed(window);
 	load_icons(launcher_apps);
 	load_icons(all_apps);
 	fprintf(stderr, "Desktop files loaded\n");
@@ -3839,7 +3940,7 @@ void create_clock(GtkWidget *parent)
 	col++;
 	gtk_tooltips_set_tip(tooltips, clock_format_line1,
 						 _("Specifies the format used to display the first line of the clock text. "
-						 "See 'man strftime' for all the available options."), NULL);
+						 "See 'man date' for all the available options."), NULL);
 
 	row++, col = 2;
 	label = gtk_label_new(_("Second line format"));
@@ -3855,7 +3956,7 @@ void create_clock(GtkWidget *parent)
 	col++;
 	gtk_tooltips_set_tip(tooltips, clock_format_line2,
 						 _("Specifies the format used to display the second line of the clock text. "
-						 "See 'man strftime' for all the available options."), NULL);
+						 "See 'man date' for all the available options."), NULL);
 
 	row++, col = 2;
 	label = gtk_label_new(_("First line timezone"));
@@ -4126,7 +4227,7 @@ void create_clock(GtkWidget *parent)
 	gtk_table_attach(GTK_TABLE(table), clock_format_tooltip, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
 	col++;
 	gtk_tooltips_set_tip(tooltips, clock_format_tooltip, _("Specifies the format used to display the clock tooltip. "
-						 "See 'man strftime' for the available options."), NULL);
+						 "See 'man date' for the available options."), NULL);
 
 	row++, col = 2;
 	label = gtk_label_new(_("Timezone"));
@@ -5280,4 +5381,45 @@ void create_tooltip(GtkWidget *parent)
 	gtk_tooltips_set_tip(tooltips, tooltip_font_color, _("Specifies the font color used to display the text of the tooltip."), NULL);
 
 	change_paragraph(parent);
+}
+
+static GtkWidget *please_wait_dialog = NULL;
+void create_please_wait(GtkWindow *parent)
+{
+	if (please_wait_dialog)
+		return;
+
+	please_wait_dialog = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	gtk_window_set_title(GTK_WINDOW(please_wait_dialog), "Center");
+	gtk_window_set_default_size(GTK_WINDOW(please_wait_dialog), 300, 150);
+	gtk_window_set_position(GTK_WINDOW(please_wait_dialog), GTK_WIN_POS_CENTER);
+	gtk_container_set_border_width(GTK_CONTAINER(please_wait_dialog), 15);
+	gtk_window_set_title(GTK_WINDOW(please_wait_dialog), _("Please wait..."));
+	gtk_window_set_deletable(GTK_WINDOW(please_wait_dialog), FALSE);
+
+	GtkWidget *label = gtk_label_new(_("Loading..."));
+	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+
+	GtkWidget *halign = gtk_alignment_new(0.5, 0.5, 0, 0);
+	gtk_container_add(GTK_CONTAINER(halign), label);
+    gtk_container_add(GTK_CONTAINER(please_wait_dialog), halign);
+
+	gtk_widget_show_all(please_wait_dialog);
+	gtk_window_set_modal(GTK_WINDOW(please_wait_dialog), TRUE);
+	// gtk_window_set_keep_above(GTK_WINDOW(please_wait_dialog), TRUE);
+	gtk_window_set_transient_for(GTK_WINDOW(please_wait_dialog), parent);
+}
+
+void process_events()
+{
+	while (gtk_events_pending())
+		gtk_main_iteration_do(FALSE);
+}
+
+void destroy_please_wait()
+{
+	if (!please_wait_dialog)
+		return;
+	gtk_widget_destroy(please_wait_dialog);
+	please_wait_dialog = NULL;
 }

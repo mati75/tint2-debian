@@ -65,8 +65,10 @@ Task *add_task(Window win)
 
 	Task task_template;
 	memset(&task_template, 0, sizeof(task_template));
+	snprintf(task_template.area.name, sizeof(task_template.area.name), "Task %d", (int)win);
 	task_template.area.has_mouse_over_effect = panel_config.mouse_effects;
 	task_template.area.has_mouse_press_effect = panel_config.mouse_effects;
+	task_template.area._is_under_mouse = full_width_area_is_under_mouse;
 	task_template.win = win;
 	task_template.desktop = get_window_desktop(win);
 	task_template.area.panel = &panels[monitor];
@@ -81,8 +83,10 @@ Task *add_task(Window win)
 	}
 	task_update_title(&task_template);
 	task_update_icon(&task_template);
+	snprintf(task_template.area.name, sizeof(task_template.area.name), "Task %d %s", (int)win, task_template.title ? task_template.title : "null");
 
-	// fprintf(stderr, "%s %d: win = %ld, task = %s\n", __FUNCTION__, __LINE__, win, task_template.title ? task_template.title : "??");
+	// fprintf(stderr, "%s %d: win = %ld, task = %s\n", __FUNCTION__, __LINE__, win, task_template.title ?
+	// task_template.title : "??");
 	// fprintf(stderr, "new task %s win %u: desktop %d, monitor %d\n", new_task.title, win, new_task.desktop, monitor);
 
 	GPtrArray *task_buttons = g_ptr_array_new();
@@ -95,6 +99,7 @@ Task *add_task(Window win)
 		memcpy(&task_instance->area, &panels[monitor].g_task.area, sizeof(Area));
 		task_instance->area.has_mouse_over_effect = panel_config.mouse_effects;
 		task_instance->area.has_mouse_press_effect = panel_config.mouse_effects;
+		task_instance->area._is_under_mouse = full_width_area_is_under_mouse;
 		task_instance->win = task_template.win;
 		task_instance->desktop = task_template.desktop;
 		task_instance->win_x = task_template.win_x;
@@ -124,20 +129,20 @@ Task *add_task(Window win)
 	*key = task_template.win;
 	g_hash_table_insert(win_to_task, key, task_buttons);
 
-	set_task_state((Task*)g_ptr_array_index(task_buttons, 0), task_template.current_state);
+	set_task_state((Task *)g_ptr_array_index(task_buttons, 0), task_template.current_state);
 
 	sort_taskbar_for_win(win);
 
 	if (taskbar_mode == MULTI_DESKTOP) {
-		Panel *panel = (Panel*)task_template.area.panel;
+		Panel *panel = (Panel *)task_template.area.panel;
 		panel->area.resize_needed = TRUE;
 	}
 
 	if (window_is_urgent(win)) {
-		add_urgent((Task*)g_ptr_array_index(task_buttons, 0));
+		add_urgent((Task *)g_ptr_array_index(task_buttons, 0));
 	}
 
-	return (Task*)g_ptr_array_index(task_buttons, 0);
+	return (Task *)g_ptr_array_index(task_buttons, 0);
 }
 
 void remove_task(Task *task)
@@ -145,7 +150,8 @@ void remove_task(Task *task)
 	if (!task)
 		return;
 
-	// fprintf(stderr, "%s %d: win = %ld, task = %s\n", __FUNCTION__, __LINE__, task->win, task->title ? task->title : "??");
+	// fprintf(stderr, "%s %d: win = %ld, task = %s\n", __FUNCTION__, __LINE__, task->win, task->title ? task->title :
+	// "??");
 
 	if (taskbar_mode == MULTI_DESKTOP) {
 		Panel *panel = task->area.panel;
@@ -297,7 +303,7 @@ void task_update_icon(Task *task)
 	int w = imlib_image_get_width();
 	int h = imlib_image_get_height();
 	Imlib_Image orig_image =
-			imlib_create_cropped_scaled_image(0, 0, w, h, panel->g_task.icon_size1, panel->g_task.icon_size1);
+		imlib_create_cropped_scaled_image(0, 0, w, h, panel->g_task.icon_size1, panel->g_task.icon_size1);
 	imlib_free_image();
 
 	imlib_context_set_image(orig_image);
@@ -313,20 +319,20 @@ void task_update_icon(Task *task)
 			adjust_asb(data32,
 					   task->icon_width,
 					   task->icon_height,
-					   panel->g_task.alpha[k],
-					   (float)panel->g_task.saturation[k] / 100,
-					   (float)panel->g_task.brightness[k] / 100);
+					   panel->g_task.alpha[k] / 100.0,
+					   panel->g_task.saturation[k] / 100.0,
+					   panel->g_task.brightness[k] / 100.0);
 			imlib_image_put_back_data(data32);
 		}
 		if (panel_config.mouse_effects) {
 			task->icon_hover[k] = adjust_icon(task->icon[k],
-											 panel_config.mouse_over_alpha,
-											 panel_config.mouse_over_saturation,
-											 panel_config.mouse_over_brightness);
+											  panel_config.mouse_over_alpha,
+											  panel_config.mouse_over_saturation,
+											  panel_config.mouse_over_brightness);
 			task->icon_press[k] = adjust_icon(task->icon[k],
-											 panel_config.mouse_pressed_alpha,
-											 panel_config.mouse_pressed_saturation,
-											 panel_config.mouse_pressed_brightness);
+											  panel_config.mouse_pressed_alpha,
+											  panel_config.mouse_pressed_saturation,
+											  panel_config.mouse_pressed_brightness);
 		}
 	}
 	imlib_context_set_image(orig_image);
@@ -363,7 +369,7 @@ void draw_task_icon(Task *task, int text_width)
 		else
 			pos_x = (task->area.width - panel->g_task.icon_size1) / 2;
 	} else {
-		pos_x = panel->g_task.area.paddingxlr + task->area.bg->border.width;
+		pos_x = task->area.bg->border.width + task->area.paddingxlr;
 	}
 
 	// Render
@@ -382,7 +388,14 @@ void draw_task_icon(Task *task, int text_width)
 	}
 
 	imlib_context_set_image(image);
-	render_image(task->area.pix, pos_x, panel->g_task.icon_posy);
+	render_image(task->area.pix, pos_x, (task->area.height - panel->g_task.icon_size1) / 2);
+	if (0) {
+		fprintf(stderr, "Task icon size: %d %d pos %d %d\n", imlib_image_get_width(), imlib_image_get_height(), pos_x, panel->g_task.icon_posy);
+		fprintf(stderr, "Task max size : %d %d\n", panel->g_task.maximum_width, panel->g_task.maximum_height);
+		fprintf(stderr, "Task area size: %d %d\n", task->area.width, task->area.height);
+		fprintf(stderr, "Task border   : %d\n", task->area.bg->border.width);
+		fprintf(stderr, "\n");
+	}
 }
 
 void draw_task(void *obj, cairo_t *c)
