@@ -96,7 +96,7 @@ typedef struct Panel {
 	// position relative to root window
 	int posx, posy;
 	int marginx, marginy;
-	int fractional_width, fractional_height;
+	gboolean fractional_width, fractional_height;
 	int monitor;
 	int font_shadow;
 	gboolean mouse_effects;
@@ -154,6 +154,8 @@ gboolean resize_panel(void *obj);
 void render_panel(Panel *panel);
 
 void set_panel_items_order(Panel *p);
+void place_panel_all_desktops(Panel *p);
+void replace_panel_all_desktops(Panel *p);
 void set_panel_properties(Panel *p);
 
 // draw background panel
@@ -166,11 +168,10 @@ Taskbar *click_taskbar(Panel *panel, int x, int y);
 Task *click_task(Panel *panel, int x, int y);
 Launcher *click_launcher(Panel *panel, int x, int y);
 LauncherIcon *click_launcher_icon(Panel *panel, int x, int y);
-gboolean click_padding(Panel *panel, int x, int y);
-gboolean click_clock(Panel *panel, int x, int y);
+Clock *click_clock(Panel *panel, int x, int y);
 
 #ifdef ENABLE_BATTERY
-gboolean click_battery(Panel *panel, int x, int y);
+Battery *click_battery(Panel *panel, int x, int y);
 #endif
 
 Area *click_area(Panel *panel, int x, int y);

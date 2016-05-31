@@ -147,8 +147,10 @@ void init_taskbar_panel(void *p)
 
 	// taskbar name
 	panel->g_taskbar.area_name.panel = panel;
+	snprintf(panel->g_taskbar.area_name.name, sizeof(panel->g_taskbar.area_name.name), "Taskbarname");
 	panel->g_taskbar.area_name.size_mode = LAYOUT_FIXED;
 	panel->g_taskbar.area_name._resize = resize_taskbarname;
+	panel->g_taskbar.area_name._is_under_mouse = full_width_area_is_under_mouse;
 	panel->g_taskbar.area_name._draw_foreground = draw_taskbarname;
 	panel->g_taskbar.area_name._on_change_layout = 0;
 	panel->g_taskbar.area_name.resize_needed = 1;
@@ -157,9 +159,11 @@ void init_taskbar_panel(void *p)
 	// taskbar
 	panel->g_taskbar.area.parent = panel;
 	panel->g_taskbar.area.panel = panel;
+	snprintf(panel->g_taskbar.area.name, sizeof(panel->g_taskbar.area.name), "Taskbar");
 	panel->g_taskbar.area.size_mode = LAYOUT_DYNAMIC;
 	panel->g_taskbar.area.alignment = taskbar_alignment;
 	panel->g_taskbar.area._resize = resize_taskbar;
+	panel->g_taskbar.area._is_under_mouse = full_width_area_is_under_mouse;
 	panel->g_taskbar.area.resize_needed = 1;
 	panel->g_taskbar.area.on_screen = TRUE;
 	if (panel_horizontal) {
@@ -176,6 +180,7 @@ void init_taskbar_panel(void *p)
 
 	// task
 	panel->g_task.area.panel = panel;
+	snprintf(panel->g_task.area.name, sizeof(panel->g_task.area.name), "Task");
 	panel->g_task.area.size_mode = LAYOUT_DYNAMIC;
 	panel->g_task.area._draw_foreground = draw_task;
 	panel->g_task.area._on_change_layout = on_change_task;
@@ -218,10 +223,16 @@ void init_taskbar_panel(void *p)
 	if ((panel->g_task.config_background_mask & (1 << TASK_URGENT)) == 0)
 		panel->g_task.background[TASK_URGENT] = panel->g_task.background[TASK_ACTIVE];
 
+	if (!panel->g_task.maximum_width)
+		panel->g_task.maximum_width = server.monitors[panel->monitor].width;
+	if (!panel->g_task.maximum_height)
+		panel->g_task.maximum_height = server.monitors[panel->monitor].height;
+
 	if (panel_horizontal) {
 		panel->g_task.area.posy = panel->g_taskbar.area.posy +
 								  panel->g_taskbar.background[TASKBAR_NORMAL]->border.width +
 								  panel->g_taskbar.area.paddingy;
+		panel->g_task.area.width = panel->g_task.maximum_width;
 		panel->g_task.area.height = panel->area.height - (2 * panel->g_task.area.posy);
 	} else {
 		panel->g_task.area.posx = panel->g_taskbar.area.posx +
@@ -257,17 +268,26 @@ void init_taskbar_panel(void *p)
 				   PANGO_ELLIPSIZE_END,
 				   FALSE);
 
-	if (!panel->g_task.maximum_width && panel_horizontal)
-		panel->g_task.maximum_width = server.monitors[panel->monitor].width;
-
 	panel->g_task.text_posx = panel->g_task.background[0]->border.width + panel->g_task.area.paddingxlr;
 	panel->g_task.text_height = panel->g_task.area.height - (2 * panel->g_task.area.paddingy);
 	if (panel->g_task.has_icon) {
-		panel->g_task.icon_size1 = panel->g_task.area.height - (2 * panel->g_task.area.paddingy);
+		panel->g_task.icon_size1 =
+			MIN(MIN(panel->g_task.maximum_width, panel->g_task.maximum_height),
+				MIN(panel->g_task.area.width, panel->g_task.area.height)) -
+			(2 * panel->g_task.area.paddingy) - 2 * panel->g_task.area.bg->border.width;
 		panel->g_task.text_posx += panel->g_task.icon_size1 + panel->g_task.area.paddingx;
 		panel->g_task.icon_posy = (panel->g_task.area.height - panel->g_task.icon_size1) / 2;
+		if (0)
+			printf("task: icon_size = %d, textx = %f, texth = %f, icony = %d, w = %d, h = %d, maxw = %d, maxh = %d\n",
+				   panel->g_task.icon_size1,
+				   panel->g_task.text_posx,
+				   panel->g_task.text_height,
+				   panel->g_task.icon_posy,
+				   panel->g_task.area.width,
+				   panel->g_task.area.height,
+				   panel->g_task.maximum_width,
+				   panel->g_task.maximum_height);
 	}
-	// printf("monitor %d, task_maximum_width %d\n", panel->monitor, panel->g_task.maximum_width);
 
 	Taskbar *taskbar;
 	panel->num_desktops = server.num_desktops;

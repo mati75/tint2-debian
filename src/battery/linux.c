@@ -17,7 +17,7 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **************************************************************************/
 
-#ifdef __linux
+#ifdef __linux__
 
 #include <stdlib.h>
 
@@ -306,6 +306,7 @@ static gboolean update_linux_battery(struct psy_battery *bat)
 
 	gint64 old_timestamp = bat->timestamp;
 	int old_energy_now = bat->energy_now;
+	gint old_power_now = bat->power_now;
 
 	/* reset values */
 	bat->present = 0;
@@ -356,6 +357,12 @@ static gboolean update_linux_battery(struct psy_battery *bat)
 		/* some hardware does not support reading current power consumption */
 		g_error_free(error);
 		bat->power_now = estimate_power_usage(bat, old_energy_now, old_timestamp);
+		if (bat->power_now == 0 && bat->status != BATTERY_FULL) {
+			/* If the hardware updates the level slower than our sampling period,
+			 * we need to sample more rarely */
+			bat->power_now = old_power_now;
+			bat->timestamp = old_timestamp;
+		}
 	} else if (error) {
 		g_error_free(error);
 		return FALSE;
@@ -430,6 +437,7 @@ int battery_os_update(BatteryState *state)
 			seconds = 3600 * (total_energy_full - total_energy_now) / total_power_now;
 		else if (state->state == BATTERY_DISCHARGING)
 			seconds = 3600 * total_energy_now / total_power_now;
+		seconds = MAX(0, seconds);
 	}
 	battery_state_set_time(state, seconds);
 

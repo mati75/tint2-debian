@@ -180,9 +180,11 @@ void init_clock_panel(void *p)
 	clock_init_fonts();
 	clock->area.parent = p;
 	clock->area.panel = p;
+	snprintf(clock->area.name, sizeof(clock->area.name), "Clock");
+	clock->area._is_under_mouse = full_width_area_is_under_mouse;
 	clock->area.has_mouse_press_effect = clock->area.has_mouse_over_effect =
-			panel_config.mouse_effects && (clock_lclick_command || clock_mclick_command || clock_rclick_command || clock_uwheel_command ||
-										   clock_dwheel_command);
+		panel_config.mouse_effects && (clock_lclick_command || clock_mclick_command || clock_rclick_command ||
+									   clock_uwheel_command || clock_dwheel_command);
 	clock->area._draw_foreground = draw_clock;
 	clock->area.size_mode = LAYOUT_FIXED;
 	clock->area._resize = resize_clock;
@@ -204,8 +206,7 @@ void clock_init_fonts()
 	if (!time1_font_desc) {
 		time1_font_desc = pango_font_description_from_string(get_default_font());
 		pango_font_description_set_weight(time1_font_desc, PANGO_WEIGHT_BOLD);
-		pango_font_description_set_size(time1_font_desc,
-		                                pango_font_description_get_size(time1_font_desc));
+		pango_font_description_set_size(time1_font_desc, pango_font_description_get_size(time1_font_desc));
 	}
 	if (!time2_font_desc) {
 		time2_font_desc = pango_font_description_from_string(get_default_font());

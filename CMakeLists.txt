@@ -3,7 +3,7 @@ cmake_minimum_required( VERSION 2.6 )
 
 option( ENABLE_BATTERY "Enable battery status plugin" ON )
 option( ENABLE_TINT2CONF "Enable tint2conf build, a GTK+2 theme configurator for tint2" ON )
-option( ENABLE_EXAMPLES "Install additional tin2rc examples" ON )
+option( ENABLE_EXTRA_THEMES "Install additional tint2 themes" ON )
 option( ENABLE_RSVG "Rsvg support (launcher only)" ON )
 option( ENABLE_SN "Startup notification support" ON )
 option( ENABLE_ASAN "Build tint2 with AddressSanitizer" OFF )
@@ -85,7 +85,7 @@ include_directories( ${PROJECT_BINARY_DIR}
                      src/launcher
                      src/tooltip
                      src/util
-					 src/execplugin
+                     src/execplugin
                      src/freespace
                      ${X11_INCLUDE_DIRS}
                      ${PANGOCAIRO_INCLUDE_DIRS}
@@ -112,12 +112,13 @@ set( SOURCES src/config.c
              src/taskbar/taskbar.c
              src/taskbar/taskbarname.c
              src/tooltip/tooltip.c
-			 src/execplugin/execplugin.c
+             src/execplugin/execplugin.c
              src/freespace/freespace.c
              src/util/area.c
              src/util/common.c
              src/util/strnatcmp.c
              src/util/timer.c
+             src/util/cache.c
              src/util/window.c )
 
 if( ENABLE_BATTERY )
@@ -241,11 +242,10 @@ install( TARGETS tint2 DESTINATION bin )
 install( FILES tint2.svg DESTINATION ${DATADIR}/icons/hicolor/scalable/apps )
 install( FILES tint2.desktop DESTINATION ${DATADIR}/applications )
 install( CODE "execute_process(COMMAND gtk-update-icon-cache -f -t ${DATADIR}/icons/hicolor WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX})" )
-install( FILES sample/tint2rc DESTINATION ${SYSCONFDIR}/xdg/tint2 )
+install( FILES themes/tint2rc DESTINATION ${SYSCONFDIR}/xdg/tint2 )
 install( FILES default_icon.png DESTINATION ${DATADIR}/tint2 )
 install( FILES AUTHORS ChangeLog README.md DESTINATION ${DOCDIR} )
 install( FILES doc/tint2.1 DESTINATION ${MANDIR}/man1 )
-if( ENABLE_EXAMPLES )
-  file( GLOB SAMPLEFILES sample/*.tint2rc )
-  install( FILES ${SAMPLEFILES} DESTINATION ${DATADIR}/tint2 )
-endif( ENABLE_EXAMPLES )
+if( ENABLE_EXTRA_THEMES )
+  add_subdirectory(themes)
+endif( ENABLE_EXTRA_THEMES )

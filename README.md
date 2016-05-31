@@ -1,25 +1,25 @@
-# New stable release: 0.12.7
-Changes: https://gitlab.com/o9000/tint2/blob/0.12.7/ChangeLog
+# Latest stable release: 0.12.11
+Changes: https://gitlab.com/o9000/tint2/blob/0.12.11/ChangeLog
 
 Documentation: https://gitlab.com/o9000/tint2/wikis/Configure
 
-Try it out with (see also [dependencies](https://gitlab.com/o9000/tint2/wikis/Install#dependencies)):
+Compile it with (see also [dependencies](https://gitlab.com/o9000/tint2/wikis/Install#dependencies)):
 ```
 git clone https://gitlab.com/o9000/tint2.git
 cd tint2
-git checkout 0.12.7
+git checkout 0.12.11
 mkdir build
 cd build
 cmake ..
 make -j4
-./tint2 &
-./src/tint2conf/tint2conf &
 ```
 
-To install from source, also run (as root):
+To install, run (as root):
 ```
 make install
 ```
+
+And then you can run the panel `tint2` and the configuration program `tint2conf`.
 
 Please report any problems to https://gitlab.com/o9000/tint2/issues. Your feedback is much appreciated.
 
@@ -69,10 +69,10 @@ tint2 is a simple panel/taskbar made for modern X window managers. It was specif
 
 # Screenshots
 
-## Default config of the latest release:
+## Default config:
 
 ![Screenshot_2016-01-23_14-42-57](https://gitlab.com/o9000/tint2/uploads/948fa74eca60864352a033580350b4c3/Screenshot_2016-01-23_14-42-57.png)
 
-## Various configurations:
+## Various configs:
 
 ![screenshot](https://gitlab.com/o9000/tint2/wikis/screenshot.png)
