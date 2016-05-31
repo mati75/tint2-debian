@@ -1,8 +1,9 @@
-tint2 (0.12.11-1) unstable; urgency=medium
+tint2 (0.12.11-1) unstable; urgency=low
 
   * New upstream release (Closes: #824568)
+  * Update Debian Standards Version to 3.9.8
 
- -- Sebastian Reichel <sre@debian.org>  Wed, 01 Jun 2016 00:06:50 +0200
+ -- Sebastian Reichel <sre@debian.org>  Wed, 01 Jun 2016 00:48:54 +0200
 
 tint2 (0.12.7-2) unstable; urgency=medium
 
