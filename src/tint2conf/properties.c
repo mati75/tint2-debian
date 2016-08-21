@@ -147,7 +147,11 @@ GtkWidget *current_background,
 		  *background_fill_color_press,
 		  *background_border_color_press,
 		  *background_border_width,
-		  *background_corner_radius;
+		  *background_corner_radius,
+          *background_border_sides_top,
+          *background_border_sides_bottom,
+          *background_border_sides_left,
+          *background_border_sides_right;
 
 
 GtkWidget *addScrollBarToWidget(GtkWidget *widget);
@@ -503,7 +507,11 @@ void create_background(GtkWidget *parent)
 									 GDK_TYPE_COLOR,
 									 GTK_TYPE_INT,
 									 GDK_TYPE_COLOR,
-									 GTK_TYPE_INT);
+									 GTK_TYPE_INT,
+                                     GTK_TYPE_BOOL,
+                                     GTK_TYPE_BOOL,
+                                     GTK_TYPE_BOOL,
+                                     GTK_TYPE_BOOL);
 
 	GtkWidget *table, *label, *button;
 	int row, col;
@@ -659,6 +667,34 @@ void create_background(GtkWidget *parent)
 	col++;
 	gtk_tooltips_set_tip(tooltips, background_corner_radius, _("The corner radius of the current background"), NULL);
 
+    row++;
+    col = 2;
+    label = gtk_label_new(_("Border sides"));
+    gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+    gtk_widget_show(label);
+    gtk_table_attach(GTK_TABLE(table), label, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
+    col++;
+
+	background_border_sides_top = gtk_check_button_new_with_label(_("Top"));
+    gtk_widget_show(background_border_sides_top);
+    gtk_table_attach(GTK_TABLE(table), background_border_sides_top, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
+    col++;
+
+	background_border_sides_bottom = gtk_check_button_new_with_label(_("Bottom"));
+    gtk_widget_show(background_border_sides_bottom);
+    gtk_table_attach(GTK_TABLE(table), background_border_sides_bottom, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
+    col++;
+
+	background_border_sides_left = gtk_check_button_new_with_label(_("Left"));
+    gtk_widget_show(background_border_sides_left);
+    gtk_table_attach(GTK_TABLE(table), background_border_sides_left, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
+    col++;
+
+	background_border_sides_right = gtk_check_button_new_with_label(_("Right"));
+    gtk_widget_show(background_border_sides_right);
+    gtk_table_attach(GTK_TABLE(table), background_border_sides_right, col, col+1, row, row+1, GTK_FILL, 0, 0, 0);
+    col++;
+
 	g_signal_connect(G_OBJECT(current_background), "changed", G_CALLBACK(current_background_changed), NULL);
 	g_signal_connect(G_OBJECT(background_fill_color), "color-set", G_CALLBACK(background_update), NULL);
 	g_signal_connect(G_OBJECT(background_border_color), "color-set", G_CALLBACK(background_update), NULL);
@@ -668,6 +704,10 @@ void create_background(GtkWidget *parent)
 	g_signal_connect(G_OBJECT(background_border_color_press), "color-set", G_CALLBACK(background_update), NULL);
 	g_signal_connect(G_OBJECT(background_border_width), "value-changed", G_CALLBACK(background_update), NULL);
 	g_signal_connect(G_OBJECT(background_corner_radius), "value-changed", G_CALLBACK(background_update), NULL);
+    g_signal_connect(G_OBJECT(background_border_sides_top), "toggled", G_CALLBACK(background_update), NULL);
+    g_signal_connect(G_OBJECT(background_border_sides_bottom), "toggled", G_CALLBACK(background_update), NULL);
+    g_signal_connect(G_OBJECT(background_border_sides_left), "toggled", G_CALLBACK(background_update), NULL);
+    g_signal_connect(G_OBJECT(background_border_sides_right), "toggled", G_CALLBACK(background_update), NULL);
 
 	change_paragraph(parent);
 }
@@ -702,6 +742,10 @@ void background_create_new()
 {
 	int r = 0;
 	int b = 0;
+    gboolean sideTop = TRUE;
+    gboolean sideBottom = TRUE;
+    gboolean sideLeft = TRUE;
+    gboolean sideRight = TRUE;
 	GdkColor fillColor;
 	cairoColor2GdkColor(0, 0, 0, &fillColor);
 	int fillOpacity = 0;
@@ -744,6 +788,10 @@ void background_create_new()
 					   bgColFillOpacityPress, fillOpacityPress,
 					   bgColBorderColorPress, &borderColorPress,
 					   bgColBorderOpacityPress, borderOpacityPress,
+                       bgColBorderSidesTop, sideTop,
+                       bgColBorderSidesBottom, sideBottom,
+                       bgColBorderSidesLeft, sideLeft,
+                       bgColBorderSidesRight, sideRight,
 					   -1);
 
 	background_update_image(index);
@@ -768,6 +816,10 @@ void background_duplicate(GtkWidget *widget, gpointer data)
 
 	int r;
 	int b;
+    gboolean sideTop;
+    gboolean sideBottom;
+    gboolean sideLeft;
+    gboolean sideRight;
 	GdkColor *fillColor;
 	int fillOpacity;
 	GdkColor *borderColor;
@@ -796,6 +848,10 @@ void background_duplicate(GtkWidget *widget, gpointer data)
 					   bgColBorderOpacityPress, &borderOpacityPress,
 					   bgColBorderWidth, &b,
 					   bgColCornerRadius, &r,
+                       bgColBorderSidesTop, &sideTop,
+                       bgColBorderSidesBottom, &sideBottom,
+                       bgColBorderSidesLeft, &sideLeft,
+                       bgColBorderSidesRight, &sideRight,
 					   -1);
 
 	gtk_list_store_append(backgrounds, &iter);
@@ -816,6 +872,10 @@ void background_duplicate(GtkWidget *widget, gpointer data)
 					   bgColBorderOpacityPress, borderOpacityPress,
 					   bgColBorderWidth, b,
 					   bgColCornerRadius, r,
+                       bgColBorderSidesTop, sideTop,
+                       bgColBorderSidesBottom, sideBottom,
+                       bgColBorderSidesLeft, sideLeft,
+                       bgColBorderSidesRight, sideRight,
 					   -1);
 	g_boxed_free(GDK_TYPE_COLOR, fillColor);
 	g_boxed_free(GDK_TYPE_COLOR, borderColor);
@@ -930,8 +990,11 @@ void background_force_update()
 	background_update(NULL, NULL);
 }
 
+static gboolean background_updates_disabled = FALSE;
 void background_update(GtkWidget *widget, gpointer data)
 {
+	if (background_updates_disabled)
+		return;
 	int index = gtk_combo_box_get_active(GTK_COMBO_BOX(current_background));
 	if (index < 0)
 		return;
@@ -945,8 +1008,14 @@ void background_update(GtkWidget *widget, gpointer data)
 
 	int r;
 	int b;
+
 	r = gtk_spin_button_get_value(GTK_SPIN_BUTTON(background_corner_radius));
 	b = gtk_spin_button_get_value(GTK_SPIN_BUTTON(background_border_width));
+
+    gboolean sideTop = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(background_border_sides_top));
+    gboolean sideBottom = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(background_border_sides_bottom));
+    gboolean sideLeft = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(background_border_sides_left));
+    gboolean sideRight = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(background_border_sides_right));
 
 	GdkColor fillColor;
 	int fillOpacity;
@@ -991,6 +1060,10 @@ void background_update(GtkWidget *widget, gpointer data)
 					   bgColBorderOpacityPress, borderOpacityPress,
 					   bgColBorderWidth, b,
 					   bgColCornerRadius, r,
+                       bgColBorderSidesTop, sideTop,
+                       bgColBorderSidesBottom, sideBottom,
+                       bgColBorderSidesLeft, sideLeft,
+                       bgColBorderSidesRight, sideRight,
 					   -1);
 	background_update_image(index);
 }
@@ -1001,6 +1074,8 @@ void current_background_changed(GtkWidget *widget, gpointer data)
 	if (index < 0)
 		return;
 
+	background_updates_disabled = TRUE;
+
 	GtkTreePath *path;
 	GtkTreeIter iter;
 
@@ -1010,6 +1085,12 @@ void current_background_changed(GtkWidget *widget, gpointer data)
 
 	int r;
 	int b;
+
+    gboolean sideTop;
+    gboolean sideBottom;
+    gboolean sideLeft;
+    gboolean sideRight;
+
 	GdkColor *fillColor;
 	int fillOpacity;
 	GdkColor *borderColor;
@@ -1039,7 +1120,16 @@ void current_background_changed(GtkWidget *widget, gpointer data)
 					   bgColBorderOpacityPress, &borderOpacityPress,
 					   bgColBorderWidth, &b,
 					   bgColCornerRadius, &r,
+                       bgColBorderSidesTop, &sideTop,
+                       bgColBorderSidesBottom, &sideBottom,
+                       bgColBorderSidesLeft, &sideLeft,
+                       bgColBorderSidesRight, &sideRight,
 					   -1);
+
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(background_border_sides_top), sideTop);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(background_border_sides_bottom), sideBottom);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(background_border_sides_left), sideLeft);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(background_border_sides_right), sideRight);
 
 	gtk_color_button_set_color(GTK_COLOR_BUTTON(background_fill_color), fillColor);
 	gtk_color_button_set_alpha(GTK_COLOR_BUTTON(background_fill_color), (fillOpacity*0xffff)/100);
@@ -1065,6 +1155,9 @@ void current_background_changed(GtkWidget *widget, gpointer data)
 	g_boxed_free(GDK_TYPE_COLOR, borderColorOver);
 	g_boxed_free(GDK_TYPE_COLOR, fillColorPress);
 	g_boxed_free(GDK_TYPE_COLOR, borderColorPress);
+
+	background_updates_disabled = FALSE;
+	background_update_image(index);
 }
 
 void create_panel(GtkWidget *parent)
@@ -5289,7 +5382,7 @@ void create_tooltip(GtkWidget *parent)
 	col++;
 
 	change_paragraph(parent);
-	
+
 	label = gtk_label_new(_("<b>Appearance</b>"));
 	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
 	gtk_label_set_use_markup(GTK_LABEL(label), TRUE);

@@ -124,6 +124,15 @@ typedef struct Color {
 	double alpha;
 } Color;
 
+typedef enum BorderMask {
+	BORDER_TOP     = 1 << 0,
+	BORDER_BOTTOM  = 1 << 1,
+	BORDER_LEFT    = 1 << 2,
+	BORDER_RIGHT   = 1 << 3
+} BorderMask;
+
+#define BORDER_ALL (BORDER_TOP | BORDER_BOTTOM | BORDER_LEFT | BORDER_RIGHT)
+
 typedef struct Border {
 	// It's essential that the first member is color
 	Color color;
@@ -131,6 +140,8 @@ typedef struct Border {
 	int width;
 	// Corner radius
 	int radius;
+	// Mask: bitwise OR of BorderMask
+	int mask;
 } Border;
 
 typedef struct Background {
@@ -219,6 +230,9 @@ typedef struct Area {
 	// Returns true if the Area handles a mouse event at the given x, y coordinates relative to the window.
 	// Leave this to NULL to use a default implementation.
 	gboolean (*_is_under_mouse)(void *obj, int x, int y);
+
+	// Prints the geometry of the object on stderr, with left indentation of indent spaces.
+	void (*_dump_geometry)(void *obj, int indent);
 } Area;
 
 // Initializes the Background member to default values.
@@ -238,6 +252,20 @@ void relayout(Area *a);
 // Distributes the Area's size to its children, repositioning them as needed.
 // If maximum_size > 0, it is an upper limit for the child size.
 int relayout_with_constraint(Area *a, int maximum_size);
+
+int left_border_width(Area *a);
+int right_border_width(Area *a);
+int left_right_border_width(Area *a);
+int top_border_width(Area *a);
+int bottom_border_width(Area *a);
+int top_bottom_border_width(Area *a);
+
+int left_bg_border_width(Background *bg);
+int right_bg_border_width(Background *bg);
+int top_bg_border_width(Background *bg);
+int bottom_bg_border_width(Background *bg);
+int left_right_bg_border_width(Background *bg);
+int top_bottom_bg_border_width(Background *bg);
 
 // Rendering
 
@@ -280,6 +308,8 @@ gboolean area_is_under_mouse(void *obj, int x, int y);
 // Useful so that a click at the edge of the screen is still handled by task buttons etc., even if technically
 // they are outside the drawing area of the button.
 gboolean full_width_area_is_under_mouse(void *obj, int x, int y);
+
+void area_dump_geometry(Area *area, int indent);
 
 void mouse_over(Area *area, int pressed);
 void mouse_out();

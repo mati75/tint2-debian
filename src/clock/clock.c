@@ -55,6 +55,7 @@ static timeout *clock_timeout;
 
 void clock_init_fonts();
 char *clock_get_tooltip(void *obj);
+void clock_dump_geometry(void *obj, int indent);
 
 void default_clock()
 {
@@ -188,6 +189,7 @@ void init_clock_panel(void *p)
 	clock->area._draw_foreground = draw_clock;
 	clock->area.size_mode = LAYOUT_FIXED;
 	clock->area._resize = resize_clock;
+	clock->area._dump_geometry = clock_dump_geometry;
 	// check consistency
 	if (!time1_format)
 		return;
@@ -276,7 +278,7 @@ gboolean resize_clock(void *obj)
 
 	if (panel_horizontal) {
 		int new_size = (time_width > date_width) ? time_width : date_width;
-		new_size += (2 * clock->area.paddingxlr) + (2 * clock->area.bg->border.width);
+		new_size += 2 * clock->area.paddingxlr + left_right_border_width(&clock->area);
 		if (new_size > clock->area.width || new_size < (clock->area.width - 6)) {
 			// we try to limit the number of resizes
 			clock->area.width = new_size + 1;
@@ -288,7 +290,7 @@ gboolean resize_clock(void *obj)
 			result = TRUE;
 		}
 	} else {
-		int new_size = time_height + date_height + (2 * (clock->area.paddingxlr + clock->area.bg->border.width));
+		int new_size = time_height + date_height + 2 * clock->area.paddingxlr + top_bottom_border_width(&clock->area);
 		if (new_size != clock->area.height) {
 			// we try to limit the number of resizes
 			clock->area.height = new_size;
@@ -332,6 +334,26 @@ void draw_clock(void *obj, cairo_t *c)
 	}
 
 	g_object_unref(layout);
+}
+
+void clock_dump_geometry(void *obj, int indent)
+{
+	Clock *clock = (Clock *)obj;
+	fprintf(stderr,
+			"%*sText 1: y = %d, text = %s\n",
+			indent,
+			"",
+			clock->time1_posy,
+			buf_time);
+	if (time2_format) {
+		fprintf(stderr,
+			"%*sText 2: y = %d, text = %s\n",
+			indent,
+			"",
+			clock->time2_posy,
+			buf_date);
+	}
+
 }
 
 char *clock_get_tooltip(void *obj)

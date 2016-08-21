@@ -36,6 +36,7 @@ Area *mouse_over_area = NULL;
 void init_background(Background *bg)
 {
 	memset(bg, 0, sizeof(Background));
+	bg->border.mask = BORDER_TOP | BORDER_BOTTOM | BORDER_LEFT | BORDER_RIGHT;
 }
 
 void initialize_positions(void *obj, int offset)
@@ -44,14 +45,14 @@ void initialize_positions(void *obj, int offset)
 	for (GList *l = a->children; l; l = l->next) {
 		Area *child = ((Area *)l->data);
 		if (panel_horizontal) {
-			child->posy = offset + a->bg->border.width + a->paddingy;
-			child->height = a->height - (2 * (a->bg->border.width + a->paddingy));
+			child->posy = offset + top_border_width(a) + a->paddingy;
+			child->height = a->height - 2 * a->paddingy - top_bottom_border_width(a);
 			if (child->_on_change_layout)
 				child->_on_change_layout(child);
 			initialize_positions(child, child->posy);
 		} else {
-			child->posx = offset + a->bg->border.width + a->paddingy;
-			child->width = a->width - (2 * (a->bg->border.width + a->paddingy));
+			child->posx = offset + left_border_width(a) + a->paddingy;
+			child->width = a->width - 2 * a->paddingy - left_right_border_width(a);
 			if (child->_on_change_layout)
 				child->_on_change_layout(child);
 			initialize_positions(child, child->posx);
@@ -107,7 +108,8 @@ void relayout_dynamic(Area *a, int level)
 	// Layout children
 	if (a->children) {
 		if (a->alignment == ALIGN_LEFT) {
-			int pos = (panel_horizontal ? a->posx : a->posy) + a->bg->border.width + a->paddingxlr;
+			int pos =
+			    (panel_horizontal ? a->posx + left_border_width(a) : a->posy + top_border_width(a)) + a->paddingxlr;
 
 			for (GList *l = a->children; l; l = l->next) {
 				Area *child = ((Area *)l->data);
@@ -133,8 +135,9 @@ void relayout_dynamic(Area *a, int level)
 				pos += panel_horizontal ? child->width + a->paddingx : child->height + a->paddingx;
 			}
 		} else if (a->alignment == ALIGN_RIGHT) {
-			int pos =
-				(panel_horizontal ? a->posx + a->width : a->posy + a->height) - a->bg->border.width - a->paddingxlr;
+			int pos = (panel_horizontal ? a->posx + a->width - right_border_width(a)
+			                            : a->posy + a->height - bottom_border_width(a)) -
+			          a->paddingxlr;
 
 			for (GList *l = g_list_last(a->children); l; l = l->prev) {
 				Area *child = ((Area *)l->data);
@@ -174,7 +177,8 @@ void relayout_dynamic(Area *a, int level)
 				children_size += (l == a->children) ? 0 : a->paddingx;
 			}
 
-			int pos = (panel_horizontal ? a->posx : a->posy) + a->bg->border.width + a->paddingxlr;
+			int pos =
+			    (panel_horizontal ? a->posx + left_border_width(a) : a->posy + top_border_width(a)) + a->paddingxlr;
 			pos += ((panel_horizontal ? a->width : a->height) - children_size) / 2;
 
 			for (GList *l = a->children; l; l = l->next) {
@@ -229,15 +233,15 @@ void draw_tree(Area *a)
 
 	if (a->pix)
 		XCopyArea(server.display,
-				  a->pix,
-				  ((Panel *)a->panel)->temp_pmap,
-				  server.gc,
-				  0,
-				  0,
-				  a->width,
-				  a->height,
-				  a->posx,
-				  a->posy);
+		          a->pix,
+		          ((Panel *)a->panel)->temp_pmap,
+		          server.gc,
+		          0,
+		          0,
+		          a->width,
+		          a->height,
+		          a->posx,
+		          a->posy);
 
 	for (GList *l = a->children; l; l = l->next)
 		draw_tree((Area *)l->data);
@@ -250,7 +254,7 @@ int relayout_with_constraint(Area *a, int maximum_size)
 
 	if (panel_horizontal) {
 		// detect free size for LAYOUT_DYNAMIC Areas
-		int size = a->width - (2 * (a->paddingxlr + a->bg->border.width));
+		int size = a->width - 2 * a->paddingxlr - left_right_border_width(a);
 		for (GList *l = a->children; l; l = l->next) {
 			Area *child = (Area *)l->data;
 			if (child->on_screen && child->size_mode == LAYOUT_FIXED) {
@@ -290,7 +294,7 @@ int relayout_with_constraint(Area *a, int maximum_size)
 		}
 	} else {
 		// detect free size for LAYOUT_DYNAMIC's Area
-		int size = a->height - (2 * (a->paddingxlr + a->bg->border.width));
+		int size = a->height - 2 * a->paddingxlr - top_bottom_border_width(a);
 		for (GList *l = a->children; l; l = l->next) {
 			Area *child = (Area *)l->data;
 			if (child->on_screen && child->size_mode == LAYOUT_FIXED) {
@@ -407,15 +411,15 @@ void draw(Area *a)
 		if (server.real_transparency)
 			clear_pixmap(a->pix, 0, 0, a->width, a->height);
 		XCopyArea(server.display,
-				  ((Panel *)a->panel)->temp_pmap,
-				  a->pix,
-				  server.gc,
-				  a->posx,
-				  a->posy,
-				  a->width,
-				  a->height,
-				  0,
-				  0);
+		          ((Panel *)a->panel)->temp_pmap,
+		          a->pix,
+		          server.gc,
+		          a->posx,
+		          a->posy,
+		          a->width,
+		          a->height,
+		          0,
+		          0);
 	} else {
 		a->_clear(a);
 	}
@@ -435,31 +439,33 @@ void draw(Area *a)
 void draw_background(Area *a, cairo_t *c)
 {
 	if (a->bg->fill_color.alpha > 0.0 ||
-		(panel_config.mouse_effects && (a->has_mouse_over_effect || a->has_mouse_press_effect))) {
+	    (panel_config.mouse_effects && (a->has_mouse_over_effect || a->has_mouse_press_effect))) {
 		if (a->mouse_state == MOUSE_OVER)
 			cairo_set_source_rgba(c,
-								  a->bg->fill_color_hover.rgb[0],
-								  a->bg->fill_color_hover.rgb[1],
-								  a->bg->fill_color_hover.rgb[2],
-								  a->bg->fill_color_hover.alpha);
+			                      a->bg->fill_color_hover.rgb[0],
+			                      a->bg->fill_color_hover.rgb[1],
+			                      a->bg->fill_color_hover.rgb[2],
+			                      a->bg->fill_color_hover.alpha);
 		else if (a->mouse_state == MOUSE_DOWN)
 			cairo_set_source_rgba(c,
-								  a->bg->fill_color_pressed.rgb[0],
-								  a->bg->fill_color_pressed.rgb[1],
-								  a->bg->fill_color_pressed.rgb[2],
-								  a->bg->fill_color_pressed.alpha);
+			                      a->bg->fill_color_pressed.rgb[0],
+			                      a->bg->fill_color_pressed.rgb[1],
+			                      a->bg->fill_color_pressed.rgb[2],
+			                      a->bg->fill_color_pressed.alpha);
 		else
 			cairo_set_source_rgba(c,
-								  a->bg->fill_color.rgb[0],
-								  a->bg->fill_color.rgb[1],
-								  a->bg->fill_color.rgb[2],
-								  a->bg->fill_color.alpha);
+			                      a->bg->fill_color.rgb[0],
+			                      a->bg->fill_color.rgb[1],
+			                      a->bg->fill_color.rgb[2],
+			                      a->bg->fill_color.alpha);
+		// Not sure about this
 		draw_rect(c,
-				  a->bg->border.width,
-				  a->bg->border.width,
-				  a->width - (2.0 * a->bg->border.width),
-				  a->height - (2.0 * a->bg->border.width),
-				  a->bg->border.radius - a->bg->border.width / 1.571);
+		          left_border_width(a),
+		          top_border_width(a),
+		          a->width - left_right_border_width(a),
+		          a->height - top_bottom_border_width(a),
+		          a->bg->border.radius - a->bg->border.width / 1.571);
+
 		cairo_fill(c);
 	}
 
@@ -469,28 +475,29 @@ void draw_background(Area *a, cairo_t *c)
 		// draw border inside (x, y, width, height)
 		if (a->mouse_state == MOUSE_OVER)
 			cairo_set_source_rgba(c,
-								  a->bg->border_color_hover.rgb[0],
-								  a->bg->border_color_hover.rgb[1],
-								  a->bg->border_color_hover.rgb[2],
-								  a->bg->border_color_hover.alpha);
+			                      a->bg->border_color_hover.rgb[0],
+			                      a->bg->border_color_hover.rgb[1],
+			                      a->bg->border_color_hover.rgb[2],
+			                      a->bg->border_color_hover.alpha);
 		else if (a->mouse_state == MOUSE_DOWN)
 			cairo_set_source_rgba(c,
-								  a->bg->border_color_pressed.rgb[0],
-								  a->bg->border_color_pressed.rgb[1],
-								  a->bg->border_color_pressed.rgb[2],
-								  a->bg->border_color_pressed.alpha);
+			                      a->bg->border_color_pressed.rgb[0],
+			                      a->bg->border_color_pressed.rgb[1],
+			                      a->bg->border_color_pressed.rgb[2],
+			                      a->bg->border_color_pressed.alpha);
 		else
 			cairo_set_source_rgba(c,
-								  a->bg->border.color.rgb[0],
-								  a->bg->border.color.rgb[1],
-								  a->bg->border.color.rgb[2],
-								  a->bg->border.color.alpha);
-		draw_rect(c,
-				  a->bg->border.width / 2.0,
-				  a->bg->border.width / 2.0,
-				  a->width - a->bg->border.width,
-				  a->height - a->bg->border.width,
-				  a->bg->border.radius);
+			                      a->bg->border.color.rgb[0],
+			                      a->bg->border.color.rgb[1],
+			                      a->bg->border.color.rgb[2],
+			                      a->bg->border.color.alpha);
+		draw_rect_on_sides(c,
+		                   left_border_width(a) / 2.,
+		                   top_border_width(a) / 2.,
+		                   a->width - left_right_border_width(a) / 2.,
+		                   a->height - top_bottom_border_width(a) / 2.,
+		                   a->bg->border.radius,
+		                   a->bg->border.mask);
 
 		cairo_stroke(c);
 	}
@@ -565,7 +572,7 @@ void mouse_over(Area *area, int pressed)
 			new_state = area->has_mouse_over_effect ? MOUSE_OVER : MOUSE_NORMAL;
 		} else {
 			new_state =
-				area->has_mouse_press_effect ? MOUSE_DOWN : area->has_mouse_over_effect ? MOUSE_OVER : MOUSE_NORMAL;
+			    area->has_mouse_press_effect ? MOUSE_DOWN : area->has_mouse_over_effect ? MOUSE_OVER : MOUSE_NORMAL;
 		}
 	}
 
@@ -578,7 +585,7 @@ void mouse_over(Area *area, int pressed)
 
 	mouse_over_area->mouse_state = new_state;
 	mouse_over_area->pix =
-		mouse_over_area->pix_by_state[mouse_over_area->has_mouse_over_effect ? mouse_over_area->mouse_state : 0];
+	    mouse_over_area->pix_by_state[mouse_over_area->has_mouse_over_effect ? mouse_over_area->mouse_state : 0];
 	if (!mouse_over_area->pix)
 		mouse_over_area->_redraw_needed = TRUE;
 	panel_refresh = TRUE;
@@ -590,7 +597,7 @@ void mouse_out()
 		return;
 	mouse_over_area->mouse_state = MOUSE_NORMAL;
 	mouse_over_area->pix =
-		mouse_over_area->pix_by_state[mouse_over_area->has_mouse_over_effect ? mouse_over_area->mouse_state : 0];
+	    mouse_over_area->pix_by_state[mouse_over_area->has_mouse_over_effect ? mouse_over_area->mouse_state : 0];
 	if (!mouse_over_area->pix)
 		mouse_over_area->_redraw_needed = TRUE;
 	panel_refresh = TRUE;
@@ -700,4 +707,110 @@ Area *find_area_under_mouse(void *root, int x, int y)
 		}
 	} while (new_result != result);
 	return result;
+}
+
+int left_border_width(Area *a)
+{
+	return left_bg_border_width(a->bg);
+}
+
+int right_border_width(Area *a)
+{
+	return right_bg_border_width(a->bg);
+}
+
+int top_border_width(Area *a)
+{
+	return top_bg_border_width(a->bg);
+}
+
+int bottom_border_width(Area *a)
+{
+	return bottom_bg_border_width(a->bg);
+}
+
+int left_right_border_width(Area *a)
+{
+	return left_right_bg_border_width(a->bg);
+}
+
+int top_bottom_border_width(Area *a)
+{
+	return top_bottom_bg_border_width(a->bg);
+}
+
+int bg_border_width(Background *bg, int mask)
+{
+	return bg->border.mask & mask ? bg->border.width : 0;
+}
+
+int left_bg_border_width(Background *bg)
+{
+	return bg_border_width(bg, BORDER_LEFT);
+}
+
+int top_bg_border_width(Background *bg)
+{
+	return bg_border_width(bg, BORDER_TOP);
+}
+
+int right_bg_border_width(Background *bg)
+{
+	return bg_border_width(bg, BORDER_RIGHT);
+}
+
+int bottom_bg_border_width(Background *bg)
+{
+	return bg_border_width(bg, BORDER_BOTTOM);
+}
+
+int left_right_bg_border_width(Background *bg)
+{
+	return left_bg_border_width(bg) + right_bg_border_width(bg);
+}
+
+int top_bottom_bg_border_width(Background *bg)
+{
+	return top_bg_border_width(bg) + bottom_bg_border_width(bg);
+}
+
+void area_dump_geometry(Area *area, int indent)
+{
+	fprintf(stderr, "%*s%s:\n", indent, "", area->name);
+	indent += 2;
+	if (!area->on_screen) {
+		fprintf(stderr, "%*shidden\n", indent, "");
+		return;
+	}
+	fprintf(stderr,
+	        "%*sBox: x = %d, y = %d, w = %d, h = %d\n",
+	        indent,
+	        "",
+	        area->posx,
+	        area->posy,
+	        area->width,
+	        area->height);
+	fprintf(stderr,
+			"%*sBorder: left = %d, right = %d, top = %d, bottom = %d\n",
+			indent,
+			"",
+			left_border_width(area),
+			right_border_width(area),
+			top_border_width(area),
+			bottom_border_width(area));
+	fprintf(stderr,
+			"%*sPadding: left = right = %d, top = bottom = %d, spacing = %d\n",
+			indent,
+			"",
+			area->paddingxlr,
+			area->paddingy,
+			area->paddingx);
+	if (area->_dump_geometry)
+		area->_dump_geometry(area, indent);
+	if (area->children) {
+		fprintf(stderr, "%*sChildren:\n", indent, "");
+		indent += 2;
+		for (GList *l = area->children; l; l = l->next)
+			area_dump_geometry((Area *)l->data, indent);
+	}
 }
