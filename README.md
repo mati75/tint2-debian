@@ -1,13 +1,14 @@
-# Latest stable release: 0.12.11
-Changes: https://gitlab.com/o9000/tint2/blob/0.12.11/ChangeLog
+# Latest stable release: 0.12.12
+Changes: https://gitlab.com/o9000/tint2/blob/0.12.12/ChangeLog
 
-Documentation: https://gitlab.com/o9000/tint2/wikis/Configure
+Documentation: [doc/tint2.md](doc/tint2.md)
 
 Compile it with (see also [dependencies](https://gitlab.com/o9000/tint2/wikis/Install#dependencies)):
+
 ```
 git clone https://gitlab.com/o9000/tint2.git
 cd tint2
-git checkout 0.12.11
+git checkout 0.12.12
 mkdir build
 cd build
 cmake ..
@@ -15,6 +16,7 @@ make -j4
 ```
 
 To install, run (as root):
+
 ```
 make install
 ```
@@ -27,7 +29,7 @@ P.S. GitLab is now the official location of the tint2 project, migrated from Goo
 
 # What is tint2?
 
-tint2 is a simple panel/taskbar made for modern X window managers. It was specifically made for Openbox but it should also work with other window managers (GNOME, KDE, XFCE etc.). It is based on ttm http://code.google.com/p/ttm/.
+tint2 is a simple panel/taskbar made for modern X window managers. It was specifically made for Openbox but it should also work with other window managers (GNOME, KDE, XFCE etc.). It is based on ttm https://code.google.com/p/ttm/.
 
 # Features
 
@@ -50,7 +52,7 @@ tint2 is a simple panel/taskbar made for modern X window managers. It was specif
 # How do I ...
 
   * [Install](https://gitlab.com/o9000/tint2/wikis/Install)
-  * [Configure](https://gitlab.com/o9000/tint2/wikis/Configure)
+  * [Configure](https://gitlab.com/o9000/tint2/blob/master/doc/tint2.md)
   * [Add applet not supported by tint2](https://gitlab.com/o9000/tint2/wikis/ThirdPartyApplets)
   * [Other frequently asked questions](https://gitlab.com/o9000/tint2/wikis/FAQ)
   * [Obtain a stack trace when tint2 crashes](https://gitlab.com/o9000/tint2/wikis/Debug)

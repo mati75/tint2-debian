@@ -239,6 +239,19 @@ void add_entry(char *key, char *value)
 		read_border_color_press = 0;
 	} else if (strcmp(key, "border_width") == 0) {
 		g_array_index(backgrounds, Background, backgrounds->len - 1).border.width = atoi(value);
+	} else if (strcmp(key, "border_sides") == 0) {
+		Background *bg = &g_array_index(backgrounds, Background, backgrounds->len - 1);
+		bg->border.mask = 0;
+		if (strchr(value, 'l') || strchr(value, 'L'))
+			bg->border.mask |= BORDER_LEFT;
+		if (strchr(value, 'r') || strchr(value, 'R'))
+			bg->border.mask |= BORDER_RIGHT;
+		if (strchr(value, 't') || strchr(value, 'T'))
+			bg->border.mask |= BORDER_TOP;
+		if (strchr(value, 'b') || strchr(value, 'B'))
+			bg->border.mask |= BORDER_BOTTOM;
+		if (!bg->border.mask)
+			bg->border.width = 0;
 	} else if (strcmp(key, "background_color") == 0) {
 		Background *bg = &g_array_index(backgrounds, Background, backgrounds->len - 1);
 		extract_values(value, &value1, &value2, &value3);
@@ -796,9 +809,10 @@ void add_entry(char *key, char *value)
 	} else if (strcmp(key, "task_maximum_size") == 0) {
 		extract_values(value, &value1, &value2, &value3);
 		panel_config.g_task.maximum_width = atoi(value1);
-		panel_config.g_task.maximum_height = 30;
 		if (value2)
 			panel_config.g_task.maximum_height = atoi(value2);
+		else
+			panel_config.g_task.maximum_height = panel_config.g_task.maximum_width;
 	} else if (strcmp(key, "task_padding") == 0) {
 		extract_values(value, &value1, &value2, &value3);
 		panel_config.g_task.area.paddingxlr = panel_config.g_task.area.paddingx = atoi(value1);
