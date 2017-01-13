@@ -1,0 +1,29 @@
+From 1b2a751de72280aea02262490e53ad5bcc08fee1 Mon Sep 17 00:00:00 2001
+From: Justin Jacobs <jajdorkster@gmail.com>
+Date: Sun, 11 Sep 2016 17:41:17 -0400
+Subject: [PATCH] tint2conf: Disable Executor tooltip when text config value is empty
+
+This fixes a bug where if an Executor had the "Tooltip" option disabled,
+editing the theme in tint2conf would re-enable it.
+---
+ src/tint2conf/properties_rw.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+Index: tint2/src/tint2conf/properties_rw.c
+===================================================================
+--- tint2.orig/src/tint2conf/properties_rw.c
++++ tint2/src/tint2conf/properties_rw.c
+@@ -1694,7 +1694,12 @@ void add_entry(char *key, char *value)
+ 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(execp_get_last()->execp_markup), atoi(value));
+ 	}
+ 	else if (strcmp(key, "execp_tooltip") == 0) {
+-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(execp_get_last()->execp_show_tooltip), 1);
++		if (strlen(value) > 0) {
++			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(execp_get_last()->execp_show_tooltip), 1);
++		}
++		else {
++			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(execp_get_last()->execp_show_tooltip), 0);
++		}
+ 		gtk_entry_set_text(GTK_ENTRY(execp_get_last()->execp_tooltip), value);
+ 	}
+ 	else if (strcmp(key, "execp_lclick_command") == 0) {
