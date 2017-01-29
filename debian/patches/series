@@ -1,3 +1,4 @@
 0001-fix-battery-on-chromebook.patch
 0002-fix-tooltip-in-tint2conf.patch
 0003-autohide-workaround-for-virtualbox-bug.patch
+0004-ignore-monitors-with-size-0.patch
