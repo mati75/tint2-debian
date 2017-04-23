@@ -8,6 +8,3 @@ override_dh_auto_configure:
 
 override_dh_auto_install:
 	dh_auto_install --destdir=$(CURDIR)/debian/tmp
-
-override_dh_installdocs:
-	dh_installdocs --link-doc=tint2
