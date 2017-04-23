@@ -199,15 +199,17 @@ pre {
 </style>
 </head>
 <body>
-<h1 id="latest-stable-release-0-12-11"><span class="md2man-title">Latest</span> <span class="md2man-section">stable</span> <span class="md2man-date">release:</span> <span class="md2man-source">0.12.11</span><a name="latest-stable-release-0-12-11" href="#latest-stable-release-0-12-11" class="md2man-permalink" title="permalink"></a></h1><p>Changes: <a href="https://gitlab.com/o9000/tint2/blob/0.12.11/ChangeLog">https://gitlab.com/o9000/tint2/blob/0.12.11/ChangeLog</a></p><p>Documentation: <a href="manual.html">manual.html</a></p><p>Compile it with (see also <a href="https://gitlab.com/o9000/tint2/wikis/Install#dependencies">dependencies</a>):</p><pre class="highlight plaintext"><code>git clone https://gitlab.com/o9000/tint2.git
+<h1 id="latest-stable-release-0-14-3"><span class="md2man-title">Latest</span> <span class="md2man-section">stable</span> <span class="md2man-date">release:</span> <span class="md2man-source">0.14.3</span><a name="latest-stable-release-0-14-3" href="#latest-stable-release-0-14-3" class="md2man-permalink" title="permalink"></a></h1><p>Changes: <a href="https://gitlab.com/o9000/tint2/blob/0.14.3/ChangeLog">https://gitlab.com/o9000/tint2/blob/0.14.3/ChangeLog</a></p><p>Documentation: <a href="manual.html">manual.html</a></p><p>Compile it with (after you install the <a href="https://gitlab.com/o9000/tint2/wikis/Install#dependencies">dependencies</a>):</p><pre class="highlight plaintext"><code>git clone https://gitlab.com/o9000/tint2.git
 cd tint2
-git checkout 0.12.11
+git checkout 0.14.3
 mkdir build
 cd build
 cmake ..
 make -j4
 </code></pre>
 <p>To install, run (as root):</p><pre class="highlight plaintext"><code>make install
+update-icon-caches /usr/local/share/icons/hicolor
+update-mime-database /usr/local/share/mime
 </code></pre>
 <p>And then you can run the panel <code>tint2</code> and the configuration program <code>tint2conf</code>.</p><p>Please report any problems to <a href="https://gitlab.com/o9000/tint2/issues">https://gitlab.com/o9000/tint2/issues</a>. Your feedback is much appreciated.</p><p>P.S. GitLab is now the official location of the tint2 project, migrated from Google Code, which is shutting down. In case you are wondering why not GitHub, BitBucket etc., we chose GitLab because it is open source, it is mature and works well, looks cool and has a very nice team.</p><h1 id="what-is-tint2">What is tint2?<a name="what-is-tint2" href="#what-is-tint2" class="md2man-permalink" title="permalink"></a></h1><p>tint2 is a simple panel/taskbar made for modern X window managers. It was specifically made for Openbox but it should also work with other window managers (GNOME, KDE, XFCE etc.). It is based on ttm <a href="https://code.google.com/p/ttm/">https://code.google.com/p/ttm/</a>.</p><h1 id="features">Features<a name="features" href="#features" class="md2man-permalink" title="permalink"></a></h1>
 <ul>
@@ -235,10 +237,16 @@ make -j4
 <li><a href="https://gitlab.com/o9000/tint2/wikis/FAQ">Other frequently asked questions</a></li>
 <li><a href="https://gitlab.com/o9000/tint2/wikis/Debug">Obtain a stack trace when tint2 crashes</a></li>
 </ul>
+<h1 id="known-issues">Known issues<a name="known-issues" href="#known-issues" class="md2man-permalink" title="permalink"></a></h1>
+<ul>
+<li>Graphic glitches on Intel graphics cards can be avoided by changing the acceleration method to UXA (<a href="https://gitlab.com/o9000/tint2/issues/595">issue 595</a>)</li>
+<li>Window managers that do not follow exactly the EWMH specification might not interact well with tint2 (known issues for <a href="https://gitlab.com/o9000/tint2/issues/385">awesome</a>, <a href="https://gitlab.com/o9000/tint2/issues/524">bspwm</a>. <a href="https://gitlab.com/o9000/tint2/issues/456">openbox-multihead</a>)</li>
+<li>Full transparency requires a compositor such as Compton (if not provided already by the window manager, as in Compiz/Unity, KDE or XFCE)</li>
+</ul>
 <h1 id="how-can-i-help-out">How can I help out?<a name="how-can-i-help-out" href="#how-can-i-help-out" class="md2man-permalink" title="permalink"></a></h1>
 <ul>
 <li>Report bugs and ask questions on the <a href="https://gitlab.com/o9000/tint2/issues">issue tracker</a>;</li>
-<li>Contribute to the development by helping us fix bugs and suggesting new features.</li>
+<li>Contribute to the development by helping us fix bugs and suggesting new features. Please read the contribution guide: <a href="CONTRIBUTING.md">CONTRIBUTING.md</a></li>
 </ul>
 <h1 id="links">Links<a name="links" href="#links" class="md2man-permalink" title="permalink"></a></h1>
 <ul>
@@ -248,6 +256,12 @@ make -j4
 <li>Downloads: <a href="https://gitlab.com/o9000/tint2-archive/tree/master">https://gitlab.com/o9000/tint2-archive/tree/master</a> or <a href="https://code.google.com/p/tint2/downloads/list">https://code.google.com/p/tint2/downloads/list</a></li>
 <li>Old project location (inactive): <a href="https://code.google.com/p/tint2">https://code.google.com/p/tint2</a></li>
 </ul>
-<h1 id="screenshots">Screenshots<a name="screenshots" href="#screenshots" class="md2man-permalink" title="permalink"></a></h1><h2 id="default-config">Default config:<a name="default-config" href="#default-config" class="md2man-permalink" title="permalink"></a></h2><p><img src="https://gitlab.com/o9000/tint2/uploads/948fa74eca60864352a033580350b4c3/Screenshot_2016-01-23_14-42-57.png" alt="Screenshot_2016-01-23_14-42-57"></p><h2 id="various-configs">Various configs:<a name="various-configs" href="#various-configs" class="md2man-permalink" title="permalink"></a></h2><p><img src="https://gitlab.com/o9000/tint2/wikis/screenshot.png" alt="screenshot"></p>
+<h1 id="screenshots">Screenshots<a name="screenshots" href="#screenshots" class="md2man-permalink" title="permalink"></a></h1><h2 id="default-config">Default config:<a name="default-config" href="#default-config" class="md2man-permalink" title="permalink"></a></h2><p><img src="https://gitlab.com/o9000/tint2/uploads/948fa74eca60864352a033580350b4c3/Screenshot_2016-01-23_14-42-57.png" alt="Screenshot_2016-01-23_14-42-57"></p><h2 id="various-configs">Various configs:<a name="various-configs" href="#various-configs" class="md2man-permalink" title="permalink"></a></h2><p><img src="https://gitlab.com/o9000/tint2/wikis/screenshot.png" alt="screenshot"></p><h2 id="demos">Demos<a name="demos" href="#demos" class="md2man-permalink" title="permalink"></a></h2>
+<ul>
+<li><a href="https://gitlab.com/o9000/tint2/wikis/whats-new-0.13.0.gif">Compact panel, separator, color gradients</a></li>
+<li><a href="https://gitlab.com/o9000/tint2/wikis/whats-new-0.12.4.gif">Executor</a></li>
+<li><a href="https://gitlab.com/o9000/tint2/wikis/whats-new-0.12.3.gif">Mouse over effects</a></li>
+<li><a href="https://gitlab.com/o9000/tint2/wikis/whats-new-0.12.gif">Distribute size between taskbars, freespace</a></li>
+</ul>
 </body>
 </html>

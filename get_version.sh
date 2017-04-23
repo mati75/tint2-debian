@@ -1,6 +1,6 @@
 #!/bin/sh
 
-MAJOR=0.12
+MAJOR=0.14
 DIRTY=""
 
 if git status 1>/dev/null 2>/dev/null
@@ -33,12 +33,13 @@ then
     fi
     VERSION=$(git describe --exact-match 2>/dev/null || echo "$MAJOR-git$(git show -s --pretty=format:%ci | cut -d ' ' -f 1 | tr -d '-').$(git show -s --pretty=format:%h)")$DIRTY
 else
-    VERSION=$(head -n 1 ChangeLog | cut -d ' ' -f 2)
+    VERSION=$(head -n 1 ChangeLog || head -n 1 ../ChangeLog | cut -d ' ' -f 2)
     if [ $VERSION = "master" ]
     then
-        VERSION=$VERSION-$(head -n 1 ChangeLog | cut -d ' ' -f 1)
+        VERSION=$VERSION-$(head -n 1 ChangeLog || head -n 1 ../ChangeLog | cut -d ' ' -f 1)
     fi
 fi
+
 
 VERSION=$(echo "$VERSION" | sed 's/^v//')
 

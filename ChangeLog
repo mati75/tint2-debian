@@ -1,3 +1,50 @@
+2017-04-23 0.14.3
+- Fixes:
+  - Make versioning more robust when building as package
+- Enhancements:
+  - Tint2conf: Open current tint2 config automatically when started from tint2
+
+2017-03-26 0.14.1
+- Fixes:
+  - Fixed tint2conf problem under FreeBSD (or generally any system using clang).
+
+2017-03-26 0.14
+- Enhancements:
+  - New plugin: button.
+
+2017-03-25 0.13.3
+- Fixes:
+  - Fixed autohide for non-bottom panels (issue #632)
+  - Translations updated (contributed by Vladimir)
+
+2017-03-19 0.13.2
+- Fixes:
+  - Fixed compilation under FreeBSD
+
+2017-03-12 0.13.1
+- Fixes:
+  - Fixed compilation with new glibc (issue #625)
+  - Fixed regression in distributing size between taskbars (issue #628)
+  - Create ~/.config dir if it does not exist (issue #629)
+- Enhancements:
+  - New config option systray_name_filter to hide hide specific apps from the system tray (contributed by Matthew Otnel)
+  - Tint2conf: minor improvements
+
+2017-03-04 0.13
+- Fixes:
+  - Ignore monitors with size 0, fixing crash (issue #618)
+  - Battery: support Asus Chromebook Flip C100PA (issue #616)
+  - Panel: do not change struts (available screen size) when shown in autohide mode (issue #619)
+  - tint2conf: executor tooltips are now correctly disabled when text config value is empty (contributed by Justin Jacobs)
+- Enhancements:
+  - Desktop files (shortcuts) used in launcher are reloaded on click, in case the file has changed
+  - New config option taskbar_hide_if_empty to hide an empty taskbar in multi_desktop mode (contributed by Benoit Averty)
+  - Gradient backgrounds (contributed by Oskari Rauta)
+  - New option: panel_shrink (fixes issue #333)
+  - Support for Path in .desktop files (contributed by Michael Messmore)
+  - Tint2conf start up is much faster
+- New plugin: separator (contributed by Oskari Rauta)
+
 2016-08-02 0.12.12
 - Fixes:
   - Set task maximum height equal to width if not specified, instead of hardcoding 30 (issue #583; thanks @VastOne)

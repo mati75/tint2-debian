@@ -9,10 +9,12 @@
 #include "area.h"
 
 typedef struct FreeSpace {
-	Area area;
+    Area area;
 } FreeSpace;
 
-void cleanup_freespace();
+struct Panel;
+
+void cleanup_freespace(struct Panel *panel);
 void init_freespace_panel(void *panel);
 
 gboolean resize_freespace(void *obj);
