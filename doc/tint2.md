@@ -1,10 +1,7 @@
-# TINT2 1 "2016-05-22"
+# TINT2 1 "2017-04-23" 0.14.3
 
 ## NAME
 tint2 - lightweight panel/taskbar
-
-## SYNOPSIS
-`tint2 [-c path_to_config_file]`
 
 ## DESCRIPTION
 tint2 is a simple panel/taskbar made for modern X window managers.
@@ -24,9 +21,19 @@ Goals:
   * Follow the freedesktop.org specifications;
   * Make certain workflows, such as multi-desktop and multi-monitor, easy to use.
 
+## SYNOPSIS
+`tint2 [OPTION...]`
+
 ## OPTIONS
 `-c path_to_config_file`
   Specifies which configuration file to use instead of the default.
+
+`-v, --version`
+  Prints version information and exits.
+
+`-h, --help`
+  Display this help and exits.
+
 
 ## CONFIGURATION
 
@@ -35,6 +42,8 @@ Goals:
   * [Introduction](#introduction)
 
   * [Backgrounds and borders](#backgrounds-and-borders)
+
+  * [Gradients](#gradients)
 
   * [Panel](#panel)
 
@@ -55,6 +64,10 @@ Goals:
   * [Battery](#battery)
 
   * [Executor](#executor)
+
+  * [Button](#button)
+
+  * [Separator](#separator)
 
   * [Example configuration](#example-configuration)
 
@@ -134,6 +147,102 @@ clock_background_id = 0
 
 Identifier 0 refers to a special background which is fully transparent, identifier 1 applies the first background defined in the config file etc.
 
+### Gradients
+
+(Available since 0.13.0)
+
+Backgrounds also allow specifying gradient layers
+that are drawn on top of the solid color background.
+
+First the user must define one or more gradients in the config file,
+each starting with `gradient = TYPE`. These must be added before backgrounds.
+
+Then gradients can be added by index to backgrounds,
+using the `gradient_id = INDEX`, `gradient_id_hover = INDEX` and
+`gradient_id_pressed = INDEX`, where `INDEX` is
+the gradient index, starting from 1.
+
+#### Gradient types
+
+Gradients vary the color between fixed control points:
+* vertical gradients: top-to-bottom;
+* horizontal gradients: left-to-right;
+* radial gradients: center-to-corners.
+
+The user must specify the start and end colors, and can optionally add extra color stops in between
+using the `color_stop` option, as explained below.
+
+##### Vertical gradient, with color varying from the top edge to the bottom edge, two colors
+
+```
+gradient = vertical
+start_color = #rrggbb opacity
+end_color = #rrggbb opacity
+```
+
+##### Horizontal gradient, with color varying from the left edge to the right edge, two colors
+
+```
+gradient = horizontal
+start_color = #rrggbb opacity
+end_color = #rrggbb opacity
+```
+
+##### Radial gradient, with color varying from the center to the corner, two colors:
+
+```
+gradient = radial
+start_color = #rrggbb opacity
+end_color = #rrggbb opacity
+```
+
+##### Adding extra color stops (0% and 100% remain fixed, more colors at x% between the start and end control points)
+
+```
+color_stop = percentage #rrggbb opacity
+```
+
+#### Gradient examples
+
+```
+# Gradient 1: thin film effect
+gradient = horizontal
+start_color = #111122 30
+end_color = #112211 30
+color_stop = 60 #221111 30
+
+# Gradient 2: radial glow
+gradient = radial
+start_color = #ffffff 20
+end_color = #ffffff 0
+
+# Gradient 3: elegant black
+gradient = vertical
+start_color = #444444 100
+end_color = #222222 100
+
+# Gradient 4: elegant black
+gradient = horizontal
+start_color = #111111 100
+end_color = #222222 100
+
+# Background 1: Active desktop name
+rounded = 2
+border_width = 1
+border_sides = TBLR
+background_color = #555555 10
+border_color = #ffffff 60
+background_color_hover = #555555 10
+border_color_hover = #ffffff 60
+background_color_pressed = #555555 10
+border_color_pressed = #ffffff 60
+gradient_id = 3
+gradient_id_hover = 4
+gradient_id_pressed = 2
+
+[...]
+```
+
 ### Panel
 
   * `panel_items = LTSBC` defines the items tint2 will show and the order of those items. Each letter refers to an item, defined as:
@@ -142,8 +251,10 @@ Identifier 0 refers to a special background which is fully transparent, identifi
     * `S` shows the Systray (also called notification area)
     * `B` shows the Battery status
     * `C` shows the Clock
-    * `F` adds an extensible spacer (freespace). Has no effect if `T` is also present. *(since 0.12)*
+    * `F` adds an extensible spacer (freespace). You can specify more than one. Has no effect if `T` is also present. *(since 0.12)*
     * `E` adds an executor plugin. You can specify more than one. *(since 0.12.4)*
+    * `P` adds a push button. You can specify more than one. *(since 0.14)*
+    * `:` adds a separator. You can specify more than one. *(since 0.13.0)*
 
     For example, `panel_items = STC` will show the systray, the taskbar and the clock (from left to right).
 
@@ -168,6 +279,8 @@ Identifier 0 refers to a special background which is fully transparent, identifi
 # The panel's width is 94% the size of the monitor, the height is 30 pixels:
 panel_size = 94% 30
 ```
+
+  * `panel_shrink = boolean (0 or 1)` : If set to 1, the panel will shrink to a compact size dynamically. *(since 0.13)*
 
   * `panel_margin = horizontal_margin vertical_margin` : The margins define the distance between the panel and the horizontal/vertical monitor edge. Use `0` to obtain a panel with the same size as the edge of the monitor (no margin).
 
@@ -241,7 +354,9 @@ panel_size = 94% 30
       * You can drag-and-drop tasks between virtual desktops;
       * You can switch between virtual desktops.
 
-  * `taskbar_distribute_size = boolean (0 or 1)` :  If enabled, in multi-desktop mode distributes between taskbars the available size proportionally to the number of tasks. Default: disabled. *(since 0.12)*
+  * `taskbar_hide_if_empty = boolean (0 or 1)` : If enabled, in multi-desktop mode the taskbars corresponding to empty desktops different from the current desktop are hidden. *(since 0.13)*
+
+  * `taskbar_distribute_size = boolean (0 or 1)` : If enabled, in multi-desktop mode distributes between taskbars the available size proportionally to the number of tasks. Default: disabled. *(since 0.12)*
 
   * `taskbar_padding = horizontal_padding vertical_padding spacing`
 
@@ -284,7 +399,7 @@ panel_size = 94% 30
 
 The following options configure the task buttons in the taskbar:
 
-  * `task_icon = boolean (0 or 1)` : Whether to display the task icon.
+  * `task_icon = boolean (0 or 1)` : Whether to display the task icon. There is no explicit option to control the task icon size; it depends on the vertical padding set with `task_padding`.
 
   * `task_text = boolean (0 or 1)` : Whether to display the task text.
 
@@ -357,6 +472,8 @@ The action semantics:
   * `systray_icon_asb = alpha (0 to 100) saturation (-100 to 100) brightness (-100 to 100)` : Adjust the systray icons color and transparency.
 
   * `systray_monitor = integer (1, 2, ...)` :  On which monitor to draw the systray. The first monitor is `1`. *(since 0.12)*
+
+  * `systray_name_filter = string` :  Regular expression to identify icon names to be hidden. For example, `^audacious$` will hide icons with the exact name `audacious`, while `aud` will hide any icons having `aud` in the name. *(since 0.13.1)*
 
 ### Clock
 
@@ -539,8 +656,8 @@ execp_continuous = 2
 
 ```
 execp = new
-execp_command = ping -i 1 -W 1 -O -D -n $(ip route | grep default | grep via | grep -o '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*') | awk '/no/ { print "<span foreground=\"#faa\">timeout</span>"; fflush(); }; /time=/ { gsub(/time=/, "", $8); printf "<span foreground=\"#7af\">%3.0f %s</span>\n", $8, $9; fflush(); } '
-execp_continuous = 1
+execp_command = ping -i 1 -c 1 -W 1 -O -D -n $(ip route | grep default | grep via | grep -o '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*') | awk '/no/ { print "<span foreground=\"#faa\">timeout</span>"; fflush(); }; /time=/ { gsub(/time=/, "", $8); printf "<span foreground=\"#7af\">%3.0f %s</span>\n", $8, $9; fflush(); } '
+execp_continuous = 0
 execp_interval = 1
 execp_markup = 1
 ```
@@ -549,9 +666,9 @@ execp_markup = 1
 
 ```
 execp = new
-execp_command = free -s 2 | awk '/^-/ { printf "Mem: '$(free -h | awk '/^Mem:/ { print $2 }')' %.0f%\n", 100*$3/($3+$4); fflush(stdout) }'
-execp_interval = 1
-execp_continuous = 1
+execp_command = free | awk '/^-/ { printf "Mem: '$(free -h | awk '/^Mem:/ { print $2 }')' %.0f%%\n", 100*$3/($3+$4); fflush(stdout) }'
+execp_interval = 5
+execp_continuous = 0
 ```
 
 ##### Network load
@@ -564,144 +681,50 @@ execp_continuous = 1
 execp_interval = 1
 ```
 
+### Button
+
+  * `button = new` : Begins the configuration of a new button. Multiple such plugins are supported; just use multiple `P`s in `panel_items`. *(since 0.14)*
+
+  * `button_icon = text` : Name or path of icon (or empty). *(since 0.14)*
+
+  * `button_text = text` : Text to display (or empty). *(since 0.14)*
+
+  * `button_tooltip = text` : The tooltip (or empty). *(since 0.14)*
+
+  * `button_font = [FAMILY-LIST] [STYLE-OPTIONS] [SIZE]` : The font used to draw the text.  *(since 0.14)*
+
+  * `button_font_color = color opacity` : The font color. *(since 0.14)*
+
+  * `button_background_id = integer` : Which background to use. *(since 0.14)*
+
+  * `button_centered = boolean (0 or 1)` : Whether to center the text. *(since 0.14)*
+
+  * `button_padding = horizontal_padding vertical_padding spacing_between_icon_and_text` *(since 0.14)*
+  * `button_max_icon_size = integer` : Sets a limit to the icon size. Otherwise, the icon will expand to the edges. *(since 0.14)*
+
+  * `button_lclick_command = text` : Command to execute on left click. If not defined, `execp_command` is  executed immediately, unless it is currently running. *(since 0.14)*
+  * `button_mclick_command = text` : Command to execute on right click. If not defined, `execp_command` is  executed immediately, unless it is currently running. *(since 0.14)*
+  * `button_rclick_command = text` : Command to execute on middle click. If not defined, `execp_command` is  executed immediately, unless it is currently running. *(since 0.14)*
+  * `button_uwheel_command = text` : Command to execute on wheel scroll up. If not defined, `execp_command` is  executed immediately, unless it is currently running. *(since 0.14)*
+  * `button_dwheel_command = text` : Command to execute on wheel scroll down. If not defined, `execp_command` is  executed immediately, unless it is currently running. *(since 0.14)*
+
+### Separator
+
+  * `separator = new` : Begins the configuration of a new separator. Multiple such plugins are supported; just use multiple `:`s in `panel_items`. *(since 0.13.0)*
+
+  * `separator_background_id = integer` : Which background to use. *(since 0.13.0)*
+
+  * `separator_color = color opacity` : The foreground color. *(since 0.13.0)*
+
+  * `separator_style = [empty | line | dots]` : The separator style. *(since 0.13.0)*
+
+  * `separator_size = integer` : The thickness of the separator. Does not include the border and padding. For example, if the style is `line`, this is the line thickness; if the style is `dots`, this is the dot's diameter. *(since 0.13.0)*
+
+  * `separator_padding = side_padding cap_padding` : The padding to add to the sides of the separator, in pixels. *(since 0.13.0)*
+
 ### Example configuration
 
-```
-#---------------------------------------------
-## TINT2 CONFIG FILE
-#---------------------------------------------
-
-#---------------------------------------------
-## BACKGROUND AND BORDER
-#---------------------------------------------
-rounded = 7
-border_width = 2
-background_color = #000000 60
-border_color = #ffffff 18
-
-rounded = 5
-border_width = 0
-background_color = #ffffff 40
-border_color = #ffffff 50
-
-rounded = 5
-border_width = 0
-background_color = #ffffff 18
-border_color = #ffffff 70
-
-#---------------------------------------------
-## PANEL
-#---------------------------------------------
-panel_monitor = all
-panel_position = bottom center
-panel_size = 94% 30
-panel_margin = 0 0
-panel_padding = 7 0
-font_shadow = 0
-panel_background_id = 1
-wm_menu = 0
-panel_dock = 0
-panel_layer = bottom
-
-#---------------------------------------------
-## TASKBAR
-#---------------------------------------------
-#taskbar_mode = multi_desktop
-taskbar_mode = single_desktop
-taskbar_padding = 2 3 2
-taskbar_background_id = 0
-#taskbar_active_background_id = 0
-
-#---------------------------------------------
-## TASKS
-#---------------------------------------------
-task_icon = 1
-task_text = 1
-task_maximum_size = 140 35
-task_centered = 1
-task_padding = 6 3
-task_font = sans 7
-task_font_color = #ffffff 70
-task_background_id = 3
-task_icon_asb = 100 0 0
-## replace STATUS by 'urgent', 'active' or 'iconfied'
-#task_STATUS_background_id = 2
-#task_STATUS_font_color = #ffffff 85
-#task_STATUS_icon_asb = 100 0 0
-## example:
-task_active_background_id = 2
-task_active_font_color = #ffffff 85
-task_active_icon_asb = 100 0 0
-urgent_nb_of_blink = 8
-
-#---------------------------------------------
-## SYSTRAYBAR
-#---------------------------------------------
-systray = 1
-systray_padding = 0 4 5
-systray_background_id = 0
-systray_sort = left2right
-systray_icon_size = 0
-systray_icon_asb = 100 0 0
-
-#---------------------------------------------
-## CLOCK
-#---------------------------------------------
-time1_format = %H:%M
-time1_font = sans 8
-time2_format = %A %d %B
-time2_font = sans 6
-clock_font_color = #ffffff 76
-clock_padding = 1 0
-clock_background_id = 0
-#clock_lclick_command = xclock
-clock_rclick_command = orage
-#clock_tooltip = %A %d %B
-#time1_timezone = :US/Hawaii
-#time2_timezone = :Europe/Berlin
-#clock_tooltip_timezone = :/usr/share/zoneinfo/Europe/Paris
-
-#---------------------------------------------
-## BATTERY
-#---------------------------------------------
-battery = 0
-battery_hide = 98
-battery_low_status = 10
-battery_low_cmd = notify-send "battery low"
-bat1_font = sans 8
-bat2_font = sans 6
-battery_font_color = #ffffff 76
-battery_padding = 1 0
-battery_background_id = 0
-
-#---------------------------------------------
-## TOOLTIP
-#---------------------------------------------
-tooltip = 0
-tooltip_padding = 2 2
-tooltip_show_timeout = 0.7
-tooltip_hide_timeout = 0.3
-tooltip_background_id = 1
-tooltip_font_color = #OOOOOO 80
-tooltip_font = sans 10
-
-#---------------------------------------------
-## MOUSE ACTION ON TASK
-#---------------------------------------------
-mouse_middle = none
-mouse_right = close
-mouse_scroll_up = toggle
-mouse_scroll_down = iconify
-
-#---------------------------------------------
-## AUTOHIDE OPTIONS
-#---------------------------------------------
-autohide = 0
-autohide_show_timeout = 0.3
-autohide_hide_timeout = 2
-autohide_height = 4
-strut_policy = minimum
-```
+See /etc/xdg/tint2/tint2rc.
 
 ## AUTHOR
 tint2 was written by Thierry Lorthiois <lorthiois@bbsoft.fr>.

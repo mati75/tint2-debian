@@ -12,27 +12,32 @@
 #include "xsettings-client.h"
 #include "icon-theme-common.h"
 
+extern IconThemeWrapper *icon_theme_wrapper;
+void load_icon_themes();
+void free_icon_themes();
+
 typedef struct Launcher {
-	// always start with area
-	Area area;
-	GSList *list_apps;  // List of char*, each is a path to a app.desktop file
-	GSList *list_icons; // List of LauncherIcon*
-	IconThemeWrapper *icon_theme_wrapper;
+    // always start with area
+    Area area;
+    GSList *list_apps;  // List of char*, each is a path to a app.desktop file
+    GSList *list_icons; // List of LauncherIcon*
+    int icon_size;
 } Launcher;
 
 typedef struct LauncherIcon {
-	// always start with area
-	Area area;
-	Imlib_Image image;
-	Imlib_Image image_hover;
-	Imlib_Image image_pressed;
-	char *cmd;
-	char *icon_name;
-	char *icon_path;
-	char *icon_tooltip;
-	int icon_size;
-	int is_app_desktop;
-	int x, y;
+    // always start with area
+    Area area;
+    char *config_path;
+    Imlib_Image image;
+    Imlib_Image image_hover;
+    Imlib_Image image_pressed;
+    char *cmd;
+    char *cwd;
+    char *icon_name;
+    char *icon_path;
+    char *icon_tooltip;
+    int icon_size;
+    int x, y;
 } LauncherIcon;
 
 extern gboolean launcher_enabled;
@@ -44,8 +49,8 @@ extern int launcher_brightness;
 extern char *icon_theme_name_xsettings; // theme name
 extern char *icon_theme_name_config;
 extern int launcher_icon_theme_override;
-extern int startup_notifications;
 extern Background *launcher_icon_bg;
+extern GList *launcher_icon_gradients;
 
 // default global data
 void default_launcher();
@@ -62,8 +67,6 @@ void launcher_default_icon_theme_changed();
 
 // Populates the list_icons list
 void launcher_load_icons(Launcher *launcher);
-// Populates the list_themes list
-void launcher_load_themes(Launcher *launcher);
 void launcher_action(LauncherIcon *icon, XEvent *e);
 
 void test_launcher_read_desktop_file();
