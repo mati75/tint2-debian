@@ -33,6 +33,8 @@ typedef struct LauncherIcon {
     Imlib_Image image_pressed;
     char *cmd;
     char *cwd;
+    gboolean start_in_terminal;
+    gboolean startup_notification;
     char *icon_name;
     char *icon_path;
     char *icon_tooltip;
@@ -67,7 +69,7 @@ void launcher_default_icon_theme_changed();
 
 // Populates the list_icons list
 void launcher_load_icons(Launcher *launcher);
-void launcher_action(LauncherIcon *icon, XEvent *e);
+void launcher_action(LauncherIcon *icon, XEvent *e, int x, int y);
 
 void test_launcher_read_desktop_file();
 void test_launcher_read_theme_file();

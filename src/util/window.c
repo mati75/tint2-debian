@@ -157,7 +157,7 @@ int get_window_desktop(Window win)
 
     if (best_match < 0)
         best_match = 0;
-    // fprintf(stderr, "window %lx %s : viewport %d, (%d, %d)\n", win, get_task(win) ? get_task(win)->title : "??",
+    // fprintf(stderr, "tint2: window %lx %s : viewport %d, (%d, %d)\n", win, get_task(win) ? get_task(win)->title : "??",
     // best_match+1, x, y);
     return best_match;
 }
@@ -185,7 +185,7 @@ int get_window_monitor(Window win)
 
     if (best_match < 0)
         best_match = 0;
-    // fprintf(stderr, "desktop %d, window %lx %s : monitor %d, (%d, %d)\n", 1 + get_current_desktop(), win,
+    // fprintf(stderr, "tint2: desktop %d, window %lx %s : monitor %d, (%d, %d)\n", 1 + get_current_desktop(), win,
     // get_task(win) ? get_task(win)->title : "??", best_match+1, x, y);
     return best_match;
 }
@@ -277,6 +277,9 @@ int get_icon_count(gulong *data, int num)
 
 gulong *get_best_icon(gulong *data, int icon_count, int num, int *iw, int *ih, int best_icon_size)
 {
+    if (icon_count < 1 || num < 1)
+        return NULL;
+
     int width[icon_count], height[icon_count], pos, i, w, h;
     gulong *icon_data[icon_count];
 

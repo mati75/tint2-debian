@@ -224,7 +224,7 @@ int compute_desired_size(Area *a)
     if (a->_compute_desired_size)
         return a->_compute_desired_size(a);
     if (a->size_mode == LAYOUT_FIXED)
-        fprintf(stderr, YELLOW "Area %s does not set desired size!" RESET "\n", a->name);
+        fprintf(stderr, YELLOW "tint2: Area %s does not set desired size!" RESET "\n", a->name);
     return container_compute_desired_size(a);
 }
 
@@ -385,7 +385,7 @@ void draw_tree(Area *a)
                   a->posx,
                   a->posy);
     else
-        fprintf(stderr, RED "%s %d: area %s has no pixmap!!!" RESET "\n", __FILE__, __LINE__, a->name);
+        fprintf(stderr, RED "tint2: %s %d: area %s has no pixmap!!!" RESET "\n", __FILE__, __LINE__, a->name);
 
     for (GList *l = a->children; l; l = l->next)
         draw_tree((Area *)l->data);
@@ -630,7 +630,7 @@ void free_area(Area *a)
     free_area_gradient_instances(a);
 }
 
-void mouse_over(Area *area, int pressed)
+void mouse_over(Area *area, gboolean pressed)
 {
     if (mouse_over_area == area && !area)
         return;
@@ -843,10 +843,10 @@ int top_bottom_bg_border_width(Background *bg)
 
 void area_dump_geometry(Area *area, int indent)
 {
-    fprintf(stderr, "%*s%s:\n", indent, "", area->name);
+    fprintf(stderr, "tint2: %*s%s:\n", indent, "", area->name);
     indent += 2;
     if (!area->on_screen) {
-        fprintf(stderr, "%*shidden\n", indent, "");
+        fprintf(stderr, "tint2: %*shidden\n", indent, "");
         return;
     }
     fprintf(stderr,
@@ -876,11 +876,188 @@ void area_dump_geometry(Area *area, int indent)
     if (area->_dump_geometry)
         area->_dump_geometry(area, indent);
     if (area->children) {
-        fprintf(stderr, "%*sChildren:\n", indent, "");
+        fprintf(stderr, "tint2: %*sChildren:\n", indent, "");
         indent += 2;
         for (GList *l = area->children; l; l = l->next)
             area_dump_geometry((Area *)l->data, indent);
     }
+}
+
+void area_compute_text_geometry(Area *area,
+                                const char *line1,
+                                const char *line2,
+                                PangoFontDescription *line1_font_desc,
+                                PangoFontDescription *line2_font_desc,
+                                int *line1_height_ink,
+                                int *line1_height,
+                                int *line1_width,
+                                int *line2_height_ink,
+                                int *line2_height,
+                                int *line2_width)
+{
+    Panel *panel = (Panel *)area->panel;
+    int available_w, available_h;
+    if (panel_horizontal) {
+        available_w = panel->area.width;
+        available_h = area->height - 2 * area->paddingy - left_right_border_width(area);
+    } else {
+        available_w = area->width - 2 * area->paddingxlr - left_right_border_width(area);
+        available_h = panel->area.height;
+    }
+
+    if (line1 && line1[0])
+        get_text_size2(line1_font_desc,
+                       line1_height_ink,
+                       line1_height,
+                       line1_width,
+                       available_h,
+                       available_w,
+                       line1,
+                       strlen(line1),
+                       PANGO_WRAP_WORD_CHAR,
+                       PANGO_ELLIPSIZE_NONE,
+                       FALSE);
+    else
+        *line1_width = *line1_height_ink = *line1_height = 0;
+
+    if (line2 && line2[0])
+        get_text_size2(line2_font_desc,
+                       line2_height_ink,
+                       line2_height,
+                       line2_width,
+                       available_h,
+                       available_w,
+                       line2,
+                       strlen(line2),
+                       PANGO_WRAP_WORD_CHAR,
+                       PANGO_ELLIPSIZE_NONE,
+                       FALSE);
+    else
+        *line2_width = *line2_height_ink = *line2_height = 0;
+}
+
+int text_area_compute_desired_size(Area *area,
+                                   const char *line1,
+                                   const char *line2,
+                                   PangoFontDescription *line1_font_desc,
+                                   PangoFontDescription *line2_font_desc)
+{
+    int line1_height_ink, line1_height, line1_width, line2_height_ink, line2_height, line2_width;
+    area_compute_text_geometry(area,
+                               line1,
+                               line2,
+                               line1_font_desc,
+                               line2_font_desc,
+                               &line1_height_ink,
+                               &line1_height,
+                               &line1_width,
+                               &line2_height_ink,
+                               &line2_height,
+                               &line2_width);
+
+    if (panel_horizontal) {
+        int new_size = MAX(line1_width, line2_width) + 2 * area->paddingxlr + left_right_border_width(area);
+        return new_size;
+    } else {
+        int new_size = line1_height + line2_height + 2 * area->paddingxlr + top_bottom_border_width(area);
+        return new_size;
+    }
+}
+
+gboolean resize_text_area(Area *area,
+                          const char *line1,
+                          const char *line2,
+                          PangoFontDescription *line1_font_desc,
+                          PangoFontDescription *line2_font_desc,
+                          int *line1_posy,
+                          int *line2_posy)
+{
+    gboolean result = FALSE;
+
+    schedule_redraw(area);
+
+    int line1_height_ink, line1_height, line1_width;
+    int line2_height_ink, line2_height, line2_width;
+    area_compute_text_geometry(area,
+                               line1,
+                               line2,
+                               line1_font_desc,
+                               line2_font_desc,
+                               &line1_height_ink,
+                               &line1_height,
+                               &line1_width,
+                               &line2_height_ink,
+                               &line2_height,
+                               &line2_width);
+
+    int new_size = text_area_compute_desired_size(area,
+                                                  line1,
+                                                  line2,
+                                                  line1_font_desc,
+                                                  line2_font_desc);
+    if (panel_horizontal) {
+        if (new_size != area->width) {
+            if (new_size < area->width && abs(new_size - area->width) < 6) {
+                // we try to limit the number of resizes
+                new_size = area->width;
+            } else {
+                area->width = new_size;
+            }
+            *line1_posy = (area->height - line1_height) / 2;
+            if (line2) {
+                *line1_posy -= (line2_height) / 2;
+                *line2_posy = *line1_posy + line1_height;
+            }
+            result = TRUE;
+        }
+    } else {
+        if (new_size != area->height) {
+            area->height = new_size;
+            *line1_posy = (area->height - line1_height) / 2;
+            if (line2) {
+                *line1_posy -= (line2_height) / 2;
+                *line2_posy = *line1_posy + line1_height;
+            }
+            result = TRUE;
+        }
+    }
+
+    return result;
+}
+
+void draw_text_area(Area *area,
+                    cairo_t *c,
+                    const char *line1,
+                    const char *line2,
+                    PangoFontDescription *line1_font_desc,
+                    PangoFontDescription *line2_font_desc,
+                    int line1_posy,
+                    int line2_posy,
+                    Color *color)
+{
+    PangoLayout *layout = pango_cairo_create_layout(c);
+    pango_layout_set_alignment(layout, PANGO_ALIGN_CENTER);
+    pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
+    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_NONE);
+    pango_layout_set_width(layout, area->width * PANGO_SCALE);
+    cairo_set_source_rgba(c, color->rgb[0], color->rgb[1], color->rgb[2], color->alpha);
+
+    if (line1 && line1[0]) {
+        pango_layout_set_font_description(layout, line1_font_desc);
+        pango_layout_set_text(layout, line1, strlen(line1));
+        pango_cairo_update_layout(c, layout);
+        draw_text(layout, c, 0, line1_posy, color, ((Panel *)area->panel)->font_shadow);
+    }
+
+    if (line2 && line2[0]) {
+        pango_layout_set_font_description(layout, line2_font_desc);
+        pango_layout_set_indent(layout, 0);
+        pango_layout_set_text(layout, line2, strlen(line2));
+        pango_cairo_update_layout(c, layout);
+        draw_text(layout, c, 0, line2_posy, color, ((Panel *)area->panel)->font_shadow);
+    }
+
+    g_object_unref(layout);
 }
 
 Area *compute_element_area(Area *area, Element element)
@@ -955,7 +1132,7 @@ void free_gradient_instance(GradientInstance *gi)
 void instantiate_area_gradients(Area *area)
 {
     if (debug_gradients)
-        fprintf(stderr, "Initializing gradients for area %s\n", area->name);
+        fprintf(stderr, "tint2: Initializing gradients for area %s\n", area->name);
     for (int i = 0; i < MOUSE_STATE_COUNT; i++) {
         g_assert_null(area->gradient_instances_by_state[i]);
         GradientClass *g = area->bg->gradients[i];
@@ -970,7 +1147,7 @@ void instantiate_area_gradients(Area *area)
 void free_area_gradient_instances(Area *area)
 {
     if (debug_gradients)
-        fprintf(stderr, "Freeing gradients for area %s\n", area->name);
+        fprintf(stderr, "tint2: Freeing gradients for area %s\n", area->name);
     for (int i = 0; i < MOUSE_STATE_COUNT; i++) {
         for (GList *l = area->gradient_instances_by_state[i]; l; l = l->next) {
             GradientInstance *gi = (GradientInstance *)l->data;
