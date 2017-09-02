@@ -2,6 +2,7 @@ tint2 (15.0-1) UNRELEASED; urgency=medium
 
   * New upstream release
   * Updated watch file for gitlab changes
+  * Update Debian Standards Version to 4.1.0
 
  -- Sebastian Reichel <sre@debian.org>  Sun, 03 Sep 2017 01:42:40 +0200
 
