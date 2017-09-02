@@ -77,6 +77,9 @@ void default_clock()
     time1_font_desc = NULL;
     time2_has_font = FALSE;
     time2_font_desc = NULL;
+    buf_time[0] = 0;
+    buf_date[0] = 0;
+    buf_tooltip[0] = 0;
 }
 
 void cleanup_clock()
@@ -111,31 +114,6 @@ void cleanup_clock()
     clock_timeout = NULL;
 }
 
-void update_clocks_sec(void *arg)
-{
-    gettimeofday(&time_clock, 0);
-    if (time1_format) {
-        for (int i = 0; i < num_panels; i++)
-            panels[i].clock.area.resize_needed = 1;
-    }
-    schedule_panel_redraw();
-}
-
-void update_clocks_min(void *arg)
-{
-    // remember old_sec because after suspend/hibernate the clock should be updated directly, and not
-    // on next minute change
-    time_t old_sec = time_clock.tv_sec;
-    gettimeofday(&time_clock, 0);
-    if (time_clock.tv_sec % 60 == 0 || time_clock.tv_sec - old_sec > 60) {
-        if (time1_format) {
-            for (int i = 0; i < num_panels; i++)
-                panels[i].clock.area.resize_needed = 1;
-        }
-        schedule_panel_redraw();
-    }
-}
-
 struct tm *clock_gettime_for_tz(const char *timezone)
 {
     if (timezone) {
@@ -150,6 +128,46 @@ struct tm *clock_gettime_for_tz(const char *timezone)
     } else {
         return localtime(&time_clock.tv_sec);
     }
+}
+
+void update_clocks()
+{
+    if (time1_format)
+        strftime(buf_time, sizeof(buf_time), time1_format, clock_gettime_for_tz(time1_timezone));
+    if (time2_format)
+        strftime(buf_date, sizeof(buf_date), time2_format, clock_gettime_for_tz(time2_timezone));
+    if (time1_format || time2_format) {
+        for (int i = 0; i < num_panels; i++)
+            panels[i].clock.area.resize_needed = 1;
+    }
+    schedule_panel_redraw();
+}
+
+int ms_until_second_change(struct timeval* tm)
+{
+    long us_until_change = 1000000 - tm->tv_usec;
+    // compute ms, rounding up so we don't ask to wait too short
+    int ms = (us_until_change+999)/1000;
+    return ms;
+}
+
+void update_clocks_sec(void *arg)
+{
+    gettimeofday(&time_clock, 0);
+    update_clocks();
+    clock_timeout = add_timeout(ms_until_second_change(&time_clock), 0, update_clocks_sec, 0, &clock_timeout);
+}
+
+void update_clocks_min(void *arg)
+{
+    // remember old_sec because after suspend/hibernate the clock should be updated directly, and not
+    // on next minute change
+    static time_t old_sec = 0;
+    gettimeofday(&time_clock, 0);
+    if (time_clock.tv_sec % 60 == 0 || time_clock.tv_sec - old_sec > 60 || (time1_format && !buf_time[0]) || (time2_format && !buf_date[0]))
+        update_clocks();
+    old_sec = time_clock.tv_sec;
+    clock_timeout = add_timeout(ms_until_second_change(&time_clock), 0, update_clocks_min, 0, &clock_timeout);
 }
 
 gboolean time_format_needs_sec_ticks(char *time_format)
@@ -169,14 +187,6 @@ void init_clock_panel(void *p)
 {
     Panel *panel = (Panel *)p;
     Clock *clock = &panel->clock;
-
-    if (!clock_timeout) {
-        if (time_format_needs_sec_ticks(time1_format) || time_format_needs_sec_ticks(time2_format)) {
-            clock_timeout = add_timeout(10, 1000, update_clocks_sec, 0, &clock_timeout);
-        } else {
-            clock_timeout = add_timeout(10, 1000, update_clocks_min, 0, &clock_timeout);
-        }
-    }
 
     if (!clock->area.bg)
         clock->area.bg = &g_array_index(backgrounds, Background, 0);
@@ -204,6 +214,14 @@ void init_clock_panel(void *p)
     if (time_tooltip_format) {
         clock->area._get_tooltip_text = clock_get_tooltip;
         strftime(buf_tooltip, sizeof(buf_tooltip), time_tooltip_format, clock_gettime_for_tz(time_tooltip_timezone));
+    }
+
+    if (!clock_timeout) {
+        if (time_format_needs_sec_ticks(time1_format) || time_format_needs_sec_ticks(time2_format)) {
+            update_clocks_sec(NULL);
+        } else {
+            update_clocks_min(NULL);
+        }
     }
 }
 
@@ -243,7 +261,7 @@ void clock_default_font_changed()
     schedule_panel_redraw();
 }
 
-void clock_compute_text_geometry(Panel *panel,
+void clock_compute_text_geometry(Clock *clock,
                                  int *time_height_ink,
                                  int *time_height,
                                  int *time_width,
@@ -251,139 +269,61 @@ void clock_compute_text_geometry(Panel *panel,
                                  int *date_height,
                                  int *date_width)
 {
-    *date_height = *date_width = 0;
-    strftime(buf_time, sizeof(buf_time), time1_format, clock_gettime_for_tz(time1_timezone));
-    get_text_size2(time1_font_desc,
-                   time_height_ink,
-                   time_height,
-                   time_width,
-                   panel->area.height,
-                   panel->area.width,
-                   buf_time,
-                   strlen(buf_time),
-                   PANGO_WRAP_WORD_CHAR,
-                   PANGO_ELLIPSIZE_NONE,
-                   FALSE);
-    if (time2_format) {
-        strftime(buf_date, sizeof(buf_date), time2_format, clock_gettime_for_tz(time2_timezone));
-        get_text_size2(time2_font_desc,
-                       date_height_ink,
-                       date_height,
-                       date_width,
-                       panel->area.height,
-                       panel->area.width,
-                       buf_date,
-                       strlen(buf_date),
-                       PANGO_WRAP_WORD_CHAR,
-                       PANGO_ELLIPSIZE_NONE,
-                       FALSE);
-    }
+    area_compute_text_geometry(&clock->area,
+                               buf_time,
+                               time2_format ? buf_date : NULL,
+                               time1_font_desc,
+                               time2_font_desc,
+                               time_height_ink,
+                               time_height,
+                               time_width,
+                               date_height_ink,
+                               date_height,
+                               date_width);
 }
 
 int clock_compute_desired_size(void *obj)
 {
     Clock *clock = (Clock *)obj;
-    Panel *panel = (Panel *)clock->area.panel;
-    int time_height_ink, time_height, time_width, date_height_ink, date_height, date_width;
-    clock_compute_text_geometry(panel,
-                                &time_height_ink,
-                                &time_height,
-                                &time_width,
-                                &date_height_ink,
-                                &date_height,
-                                &date_width);
-
-    if (panel_horizontal) {
-        int new_size = (time_width > date_width) ? time_width : date_width;
-        new_size += 2 * clock->area.paddingxlr + left_right_border_width(&clock->area);
-        return new_size;
-    } else {
-        int new_size = time_height + date_height + 2 * clock->area.paddingxlr + top_bottom_border_width(&clock->area);
-        return new_size;
-    }
+    return text_area_compute_desired_size(&clock->area,
+                                          buf_time,
+                                          time2_format ? buf_date : NULL,
+                                          time1_font_desc,
+                                          time2_font_desc);
 }
 
 gboolean resize_clock(void *obj)
 {
     Clock *clock = (Clock *)obj;
-    Panel *panel = (Panel *)clock->area.panel;
-    gboolean result = FALSE;
-
-    schedule_redraw(&clock->area);
-
-    int time_height_ink, time_height, time_width, date_height_ink, date_height, date_width;
-    clock_compute_text_geometry(panel,
-                                &time_height_ink,
-                                &time_height,
-                                &time_width,
-                                &date_height_ink,
-                                &date_height,
-                                &date_width);
-
-    int new_size = clock_compute_desired_size(clock);
-    if (panel_horizontal) {
-        if (new_size > clock->area.width || new_size < (clock->area.width - 6)) {
-            // we try to limit the number of resizes
-            clock->area.width = new_size + 1;
-            clock->time1_posy = (clock->area.height - time_height) / 2;
-            if (time2_format) {
-                clock->time1_posy -= (date_height) / 2;
-                clock->time2_posy = clock->time1_posy + time_height;
-            }
-            result = TRUE;
-        }
-    } else {
-        if (new_size != clock->area.height) {
-            // we try to limit the number of resizes
-            clock->area.height = new_size;
-            clock->time1_posy = (clock->area.height - time_height) / 2;
-            if (time2_format) {
-                clock->time1_posy -= (date_height) / 2;
-                clock->time2_posy = clock->time1_posy + time_height;
-            }
-            result = TRUE;
-        }
-    }
-
-    return result;
+    return resize_text_area(&clock->area,
+                            buf_time,
+                            time2_format ? buf_date : NULL,
+                            time1_font_desc,
+                            time2_font_desc,
+                            &clock->time1_posy,
+                            &clock->time2_posy);
 }
 
 void draw_clock(void *obj, cairo_t *c)
 {
-    Clock *clock = obj;
-    PangoLayout *layout = pango_cairo_create_layout(c);
-
-    pango_layout_set_font_description(layout, time1_font_desc);
-    pango_layout_set_width(layout, clock->area.width * PANGO_SCALE);
-    pango_layout_set_alignment(layout, PANGO_ALIGN_CENTER);
-    pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
-    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_NONE);
-    pango_layout_set_text(layout, buf_time, strlen(buf_time));
-
-    cairo_set_source_rgba(c, clock->font.rgb[0], clock->font.rgb[1], clock->font.rgb[2], clock->font.alpha);
-
-    pango_cairo_update_layout(c, layout);
-    draw_text(layout, c, 0, clock->time1_posy, &clock->font, ((Panel *)clock->area.panel)->font_shadow);
-
-    if (time2_format) {
-        pango_layout_set_font_description(layout, time2_font_desc);
-        pango_layout_set_indent(layout, 0);
-        pango_layout_set_text(layout, buf_date, strlen(buf_date));
-        pango_layout_set_width(layout, clock->area.width * PANGO_SCALE);
-
-        pango_cairo_update_layout(c, layout);
-        draw_text(layout, c, 0, clock->time2_posy, &clock->font, ((Panel *)clock->area.panel)->font_shadow);
-    }
-
-    g_object_unref(layout);
+    Clock *clock = (Clock *)obj;
+    draw_text_area(&clock->area,
+                   c,
+                   buf_time,
+                   time2_format ? buf_date : NULL,
+                   time1_font_desc,
+                   time2_font_desc,
+                   clock->time1_posy,
+                   clock->time2_posy,
+                   &clock->font);
 }
 
 void clock_dump_geometry(void *obj, int indent)
 {
     Clock *clock = (Clock *)obj;
-    fprintf(stderr, "%*sText 1: y = %d, text = %s\n", indent, "", clock->time1_posy, buf_time);
+    fprintf(stderr, "tint2: %*sText 1: y = %d, text = %s\n", indent, "", clock->time1_posy, buf_time);
     if (time2_format) {
-        fprintf(stderr, "%*sText 2: y = %d, text = %s\n", indent, "", clock->time2_posy, buf_date);
+        fprintf(stderr, "tint2: %*sText 2: y = %d, text = %s\n", indent, "", clock->time2_posy, buf_date);
     }
 }
 
@@ -393,7 +333,7 @@ char *clock_get_tooltip(void *obj)
     return strdup(buf_tooltip);
 }
 
-void clock_action(int button, Time time)
+void clock_action(void *obj, int button, int x, int y, Time time)
 {
     char *command = NULL;
     switch (button) {
@@ -413,5 +353,5 @@ void clock_action(int button, Time time)
         command = clock_dwheel_command;
         break;
     }
-    tint_exec(command, NULL, NULL, time);
+    tint_exec(command, NULL, NULL, time, obj, x, y, FALSE, TRUE);
 }

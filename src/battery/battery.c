@@ -35,20 +35,25 @@ gboolean bat1_has_font;
 PangoFontDescription *bat1_font_desc;
 gboolean bat2_has_font;
 PangoFontDescription *bat2_font_desc;
+char *bat1_format;
+char *bat2_format;
 struct BatteryState battery_state;
 gboolean battery_enabled;
 gboolean battery_tooltip_enabled;
 int percentage_hide;
 static timeout *battery_timeout;
 
-static char buf_bat_percentage[10];
-static char buf_bat_time[20];
+#define BATTERY_BUF_SIZE 256
+static char buf_bat_line1[BATTERY_BUF_SIZE];
+static char buf_bat_line2[BATTERY_BUF_SIZE];
 
 int8_t battery_low_status;
 gboolean battery_low_cmd_sent;
+gboolean battery_full_cmd_sent;
 char *ac_connected_cmd;
 char *ac_disconnected_cmd;
 char *battery_low_cmd;
+char *battery_full_cmd;
 char *battery_lclick_command;
 char *battery_mclick_command;
 char *battery_rclick_command;
@@ -70,14 +75,18 @@ void default_battery()
     battery_found = FALSE;
     percentage_hide = 101;
     battery_low_cmd_sent = FALSE;
+    battery_full_cmd_sent = FALSE;
     battery_timeout = NULL;
     bat1_has_font = FALSE;
     bat1_font_desc = NULL;
+    bat1_format = NULL;
     bat2_has_font = FALSE;
     bat2_font_desc = NULL;
+    bat2_format = NULL;
     ac_connected_cmd = NULL;
     ac_disconnected_cmd = NULL;
     battery_low_cmd = NULL;
+    battery_full_cmd = NULL;
     battery_lclick_command = NULL;
     battery_mclick_command = NULL;
     battery_rclick_command = NULL;
@@ -98,6 +107,12 @@ void cleanup_battery()
     bat2_font_desc = NULL;
     free(battery_low_cmd);
     battery_low_cmd = NULL;
+    free(battery_full_cmd);
+    battery_full_cmd = NULL;
+    free(bat1_format);
+    bat1_format = NULL;
+    free(bat2_format);
+    bat2_format = NULL;
     free(battery_lclick_command);
     battery_lclick_command = NULL;
     free(battery_mclick_command);
@@ -119,6 +134,91 @@ void cleanup_battery()
     battery_os_free();
 }
 
+// Appends addendum to dest, and does not allow dest to grow over limit (including NULL terminator).
+char *strnappend(char *dest, const char *addendum, size_t limit)
+{
+    char *tmp = strdup(dest);
+
+    // Actually concatenate them.
+    snprintf(dest, limit, "%s%s", tmp, addendum);
+
+    free(tmp);
+    return dest;
+}
+
+void battery_update_text(char *dest, char *format)
+{
+    if (!battery_enabled || !dest || !format)
+        return;
+    // We want to loop over the format specifier, replacing any known symbols with our battery data.
+    // First, erase anything already stored in the buffer.
+    // This ensures the string will always be null-terminated.
+    bzero(dest, BATTERY_BUF_SIZE);
+
+    for (size_t o = 0; o < strlen(format); o++) {
+        char buf[BATTERY_BUF_SIZE];
+        bzero(buf, BATTERY_BUF_SIZE);
+        char *c = &format[o];
+        // Format specification:
+        // %s :	State (charging, discharging, full, unknown)
+        // %m :	Minutes left (estimated).
+        // %h : Hours left (estimated).
+        // %t :	Time left. This is equivalent to the old behaviour; i.e. "(plugged in)" or "hrs:mins" otherwise.
+        // %p :	Percentage left. Includes the % sign.
+        if (*c == '%') {
+            c++;
+            o++; // Skip the format control character.
+            switch (*c) {
+            case 's':
+                // Append the appropriate status message to the string.
+                strnappend(dest,
+                        (battery_state.state == BATTERY_CHARGING)
+                            ? "Charging"
+                            : (battery_state.state == BATTERY_DISCHARGING)
+                                  ? "Discharging"
+                                  : (battery_state.state == BATTERY_FULL)
+                                        ? "Full"
+                                        : "Unknown",
+                        BATTERY_BUF_SIZE);
+                break;
+            case 'm':
+                snprintf(buf, sizeof(buf), "%02d", battery_state.time.minutes);
+                strnappend(dest, buf, BATTERY_BUF_SIZE);
+                break;
+            case 'h':
+                snprintf(buf, sizeof(buf), "%02d", battery_state.time.hours);
+                strnappend(dest, buf, BATTERY_BUF_SIZE);
+                break;
+            case 'p':
+                snprintf(buf, sizeof(buf), "%d%%", battery_state.percentage);
+                strnappend(dest, buf, BATTERY_BUF_SIZE);
+                break;
+            case 't':
+                if (battery_state.state == BATTERY_FULL) {
+                    snprintf(buf, sizeof(buf), "Full");
+                    strnappend(dest, buf, BATTERY_BUF_SIZE);
+                } else {
+                    snprintf(buf, sizeof(buf), "%02d:%02d", battery_state.time.hours, battery_state.time.minutes);
+                    strnappend(dest, buf, BATTERY_BUF_SIZE);
+                }
+                break;
+
+            case '%':
+            case '\0':
+                strnappend(dest, "%", BATTERY_BUF_SIZE);
+                break;
+            default:
+                fprintf(stderr, "tint2: Battery: unrecognised format specifier '%%%c'.\n", *c);
+                buf[0] = *c;
+                strnappend(dest, buf, BATTERY_BUF_SIZE);
+            }
+        } else {
+            buf[0] = *c;
+            strnappend(dest, buf, BATTERY_BUF_SIZE);
+        }
+    }
+}
+
 void init_battery()
 {
     if (!battery_enabled)
@@ -126,8 +226,7 @@ void init_battery()
 
     battery_found = battery_os_init();
 
-    if (!battery_timeout)
-        battery_timeout = add_timeout(10, 30000, update_battery_tick, 0, &battery_timeout);
+    battery_timeout = add_timeout(10, 30000, update_battery_tick, 0, &battery_timeout);
 
     update_battery();
 }
@@ -169,6 +268,11 @@ void init_battery_panel(void *p)
     if (battery_tooltip_enabled)
         battery->area._get_tooltip_text = battery_get_tooltip;
     instantiate_area_gradients(&battery->area);
+
+    if (!bat1_format && !bat2_format) {
+        bat1_format = strdup("%p");
+        bat2_format = strdup("%t");
+    }
 }
 
 void battery_init_fonts()
@@ -242,6 +346,16 @@ void update_battery_tick(void *arg)
         battery_low_cmd_sent = FALSE;
     }
 
+    if ((battery_state.percentage >= 100 || battery_state.state == BATTERY_FULL) &&
+        !battery_full_cmd_sent) {
+        tint_exec_no_sn(battery_full_cmd);
+        battery_full_cmd_sent = TRUE;
+    }
+    if (battery_state.percentage < 100 && battery_state.state != BATTERY_FULL &&
+        battery_full_cmd_sent) {
+        battery_full_cmd_sent = FALSE;
+    }
+
     for (int i = 0; i < num_panels; i++) {
         // Show/hide if needed
         if (!battery_found) {
@@ -278,158 +392,51 @@ int update_battery()
         battery_state.percentage = 100;
     }
 
+    battery_update_text(buf_bat_line1, bat1_format);
+    if (bat2_format != 0) {
+        battery_update_text(buf_bat_line2, bat2_format);
+    }
+
     return err;
 }
 
 int battery_compute_desired_size(void *obj)
 {
     Battery *battery = (Battery *)obj;
-    Panel *panel = (Panel *)battery->area.panel;
-    int bat_percentage_height, bat_percentage_width, bat_percentage_height_ink;
-    int bat_time_height, bat_time_width, bat_time_height_ink;
-
-    snprintf(buf_bat_percentage, sizeof(buf_bat_percentage), "%d%%", battery_state.percentage);
-    if (battery_state.state == BATTERY_FULL) {
-        strcpy(buf_bat_time, "Full");
-    } else {
-        snprintf(buf_bat_time, sizeof(buf_bat_time), "%02d:%02d", battery_state.time.hours, battery_state.time.minutes);
-    }
-    get_text_size2(bat1_font_desc,
-                   &bat_percentage_height_ink,
-                   &bat_percentage_height,
-                   &bat_percentage_width,
-                   panel->area.height,
-                   panel->area.width,
-                   buf_bat_percentage,
-                   strlen(buf_bat_percentage),
-                   PANGO_WRAP_WORD_CHAR,
-                   PANGO_ELLIPSIZE_NONE,
-                   FALSE);
-    get_text_size2(bat2_font_desc,
-                   &bat_time_height_ink,
-                   &bat_time_height,
-                   &bat_time_width,
-                   panel->area.height,
-                   panel->area.width,
-                   buf_bat_time,
-                   strlen(buf_bat_time),
-                   PANGO_WRAP_WORD_CHAR,
-                   PANGO_ELLIPSIZE_NONE,
-                   FALSE);
-
-    if (panel_horizontal) {
-        int new_size = (bat_percentage_width > bat_time_width) ? bat_percentage_width : bat_time_width;
-        new_size += 2 * battery->area.paddingxlr + left_right_border_width(&battery->area);
-        return new_size;
-    } else {
-        int new_size = bat_percentage_height + bat_time_height + 2 * battery->area.paddingxlr +
-                       top_bottom_border_width(&battery->area);
-        return new_size;
-    }
+    return text_area_compute_desired_size(&battery->area, buf_bat_line1, buf_bat_line2, bat1_font_desc, bat2_font_desc);
 }
 
 gboolean resize_battery(void *obj)
 {
     Battery *battery = (Battery *)obj;
-    Panel *panel = (Panel *)battery->area.panel;
-    int bat_percentage_height, bat_percentage_width, bat_percentage_height_ink;
-    int bat_time_height, bat_time_width, bat_time_height_ink;
-    int ret = 0;
-
-    snprintf(buf_bat_percentage, sizeof(buf_bat_percentage), "%d%%", battery_state.percentage);
-    if (battery_state.state == BATTERY_FULL) {
-        strcpy(buf_bat_time, "Full");
-    } else {
-        snprintf(buf_bat_time, sizeof(buf_bat_time), "%02d:%02d", battery_state.time.hours, battery_state.time.minutes);
-    }
-    get_text_size2(bat1_font_desc,
-                   &bat_percentage_height_ink,
-                   &bat_percentage_height,
-                   &bat_percentage_width,
-                   panel->area.height,
-                   panel->area.width,
-                   buf_bat_percentage,
-                   strlen(buf_bat_percentage),
-                   PANGO_WRAP_WORD_CHAR,
-                   PANGO_ELLIPSIZE_NONE,
-                   FALSE);
-    get_text_size2(bat2_font_desc,
-                   &bat_time_height_ink,
-                   &bat_time_height,
-                   &bat_time_width,
-                   panel->area.height,
-                   panel->area.width,
-                   buf_bat_time,
-                   strlen(buf_bat_time),
-                   PANGO_WRAP_WORD_CHAR,
-                   PANGO_ELLIPSIZE_NONE,
-                   FALSE);
-
-    if (panel_horizontal) {
-        int new_size = (bat_percentage_width > bat_time_width) ? bat_percentage_width : bat_time_width;
-        new_size += 2 * battery->area.paddingxlr + left_right_border_width(&battery->area);
-        if (new_size > battery->area.width || new_size < battery->area.width - 2) {
-            // we try to limit the number of resize
-            battery->area.width = new_size;
-            battery->bat1_posy = (battery->area.height - bat_percentage_height - bat_time_height) / 2;
-            battery->bat2_posy = battery->bat1_posy + bat_percentage_height;
-            ret = 1;
-        }
-    } else {
-        int new_size = bat_percentage_height + bat_time_height + 2 * battery->area.paddingxlr +
-                       top_bottom_border_width(&battery->area);
-        if (new_size > battery->area.height || new_size < battery->area.height - 2) {
-            battery->area.height = new_size;
-            battery->bat1_posy = (battery->area.height - bat_percentage_height - bat_time_height - 2) / 2;
-            battery->bat2_posy = battery->bat1_posy + bat_percentage_height + 2;
-            ret = 1;
-        }
-    }
-
-    schedule_redraw(&battery->area);
-    return ret;
+    return resize_text_area(&battery->area,
+                            buf_bat_line1,
+                            buf_bat_line2,
+                            bat1_font_desc,
+                            bat2_font_desc,
+                            &battery->bat1_posy,
+                            &battery->bat2_posy);
 }
 
 void draw_battery(void *obj, cairo_t *c)
 {
-    Battery *battery = obj;
-
-    PangoLayout *layout = pango_cairo_create_layout(c);
-    pango_layout_set_font_description(layout, bat1_font_desc);
-    pango_layout_set_width(layout, battery->area.width * PANGO_SCALE);
-    pango_layout_set_alignment(layout, PANGO_ALIGN_CENTER);
-    pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
-    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_NONE);
-    pango_layout_set_text(layout, buf_bat_percentage, strlen(buf_bat_percentage));
-
-    cairo_set_source_rgba(c,
-                          battery->font_color.rgb[0],
-                          battery->font_color.rgb[1],
-                          battery->font_color.rgb[2],
-                          battery->font_color.alpha);
-
-    pango_cairo_update_layout(c, layout);
-    draw_text(layout, c, 0, battery->bat1_posy, &battery->font_color, ((Panel *)battery->area.panel)->font_shadow);
-
-    pango_layout_set_font_description(layout, bat2_font_desc);
-    pango_layout_set_indent(layout, 0);
-    pango_layout_set_wrap(layout, PANGO_WRAP_WORD_CHAR);
-    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_NONE);
-    pango_layout_set_text(layout, buf_bat_time, strlen(buf_bat_time));
-    pango_layout_set_width(layout, battery->area.width * PANGO_SCALE);
-
-    pango_cairo_update_layout(c, layout);
-    draw_text(layout, c, 0, battery->bat2_posy, &battery->font_color, ((Panel *)battery->area.panel)->font_shadow);
-    pango_cairo_show_layout(c, layout);
-
-    g_object_unref(layout);
+    Battery *battery = (Battery *)obj;
+    draw_text_area(&battery->area,
+                   c,
+                   buf_bat_line1,
+                   buf_bat_line2,
+                   bat1_font_desc,
+                   bat2_font_desc,
+                   battery->bat1_posy,
+                   battery->bat2_posy,
+                   &battery->font_color);
 }
 
 void battery_dump_geometry(void *obj, int indent)
 {
-    Battery *battery = obj;
-    fprintf(stderr, "%*sText 1: y = %d, text = %s\n", indent, "", battery->bat1_posy, buf_bat_percentage);
-    fprintf(stderr, "%*sText 2: y = %d, text = %s\n", indent, "", battery->bat2_posy, buf_bat_time);
+    Battery *battery = (Battery *)obj;
+    fprintf(stderr, "tint2: %*sText 1: y = %d, text = %s\n", indent, "", battery->bat1_posy, buf_bat_line1);
+    fprintf(stderr, "tint2: %*sText 2: y = %d, text = %s\n", indent, "", battery->bat2_posy, buf_bat_line2);
 }
 
 char *battery_get_tooltip(void *obj)
@@ -437,7 +444,7 @@ char *battery_get_tooltip(void *obj)
     return battery_os_tooltip();
 }
 
-void battery_action(int button, Time time)
+void battery_action(void *obj, int button, int x, int y, Time time)
 {
     char *command = NULL;
     switch (button) {
@@ -457,5 +464,5 @@ void battery_action(int button, Time time)
         command = battery_dwheel_command;
         break;
     }
-    tint_exec(command, NULL, NULL, time);
+    tint_exec(command, NULL, NULL, time, obj, x, y, FALSE, TRUE);
 }

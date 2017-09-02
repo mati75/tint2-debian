@@ -263,6 +263,39 @@ int relayout_with_constraint(Area *a, int maximum_size);
 int compute_desired_size(Area *a);
 int container_compute_desired_size(Area *a);
 
+void area_compute_text_geometry(Area *area,
+                                const char *line1,
+                                const char *line2,
+                                PangoFontDescription *line1_font_desc,
+                                PangoFontDescription *line2_font_desc,
+                                int *line1_height_ink,
+                                int *line1_height,
+                                int *line1_width,
+                                int *line2_height_ink,
+                                int *line2_height,
+                                int *line2_width);
+int text_area_compute_desired_size(Area *area,
+                                   const char *line1,
+                                   const char *line2,
+                                   PangoFontDescription *line1_font_desc,
+                                   PangoFontDescription *line2_font_desc);
+gboolean resize_text_area(Area *area,
+                          const char *line1,
+                          const char *line2,
+                          PangoFontDescription *line1_font_desc,
+                          PangoFontDescription *line2_font_desc,
+                          int *line1_posy,
+                          int *line2_posy);
+void draw_text_area(Area *area,
+                    cairo_t *c,
+                    const char *line1,
+                    const char *line2,
+                    PangoFontDescription *line1_font_desc,
+                    PangoFontDescription *line2_font_desc,
+                    int line1_posy,
+                    int line2_posy,
+                    Color *color);
+
 int left_border_width(Area *a);
 int right_border_width(Area *a);
 int left_right_border_width(Area *a);
@@ -324,7 +357,7 @@ void free_area_gradient_instances(Area *area);
 
 void area_dump_geometry(Area *area, int indent);
 
-void mouse_over(Area *area, int pressed);
+void mouse_over(Area *area, gboolean pressed);
 void mouse_out();
 
 void update_gradient(GradientInstance *gi);

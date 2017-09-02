@@ -48,12 +48,15 @@ extern gboolean bat1_has_font;
 extern PangoFontDescription *bat1_font_desc;
 extern gboolean bat2_has_font;
 extern PangoFontDescription *bat2_font_desc;
+extern char *bat1_format;
+extern char *bat2_format;
 extern gboolean battery_enabled;
 extern gboolean battery_tooltip_enabled;
 extern int percentage_hide;
 
 extern int8_t battery_low_status;
 extern char *battery_low_cmd;
+extern char *battery_full_cmd;
 
 extern char *ac_connected_cmd;
 extern char *ac_disconnected_cmd;
@@ -108,7 +111,7 @@ void battery_default_font_changed();
 
 gboolean resize_battery(void *obj);
 
-void battery_action(int button, Time time);
+void battery_action(void *obj, int button, int x, int y, Time time);
 
 /* operating system specific functions */
 gboolean battery_os_init();
