@@ -1,11 +1,11 @@
-tint2 (15.0-1) UNRELEASED; urgency=medium
+tint2 (15.0-1) unstable; urgency=medium
 
   * New upstream release
   * Updated watch file for gitlab changes
   * Update Debian Standards Version to 4.1.0
   * Enable full hardening
 
- -- Sebastian Reichel <sre@debian.org>  Sun, 03 Sep 2017 01:42:40 +0200
+ -- Sebastian Reichel <sre@debian.org>  Sun, 03 Sep 2017 03:25:33 +0200
 
 tint2 (0.14.3-1) experimental; urgency=medium
 
