@@ -1,3 +1,10 @@
+tint2 (15.0-2) unstable; urgency=medium
+
+  * Add patch to be compliant with POSIX.1-2001 and POSIX.1-2008 to
+    fix FTBFS on non x86 platforms.
+
+ -- Sebastian Reichel <sre@debian.org>  Sun, 03 Sep 2017 14:59:33 +0200
+
 tint2 (15.0-1) unstable; urgency=medium
 
   * New upstream release

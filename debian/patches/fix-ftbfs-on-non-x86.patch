@@ -1,0 +1,18 @@
+Author: Sebastian Reichel <sre@debian.org>
+Description: Fix FTBFS error on non x86 systems
+ According to POSIX.1-2001 and POSIX.1-2008 <sys/select.h> is
+ required for FD_ZERO (Earlier standards do not need it).
+Last-Updated: 2017-09-03
+
+diff --git a/src/main.c b/src/main.c
+index 8af7602..f82afd6 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -38,6 +38,7 @@
+ #include <time.h>
+ #include <sys/time.h>
+ #include <sys/wait.h>
++#include <sys/select.h>
+ 
+ #ifdef HAVE_SN
+ #include <libsn/sn.h>
