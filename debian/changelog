@@ -1,3 +1,10 @@
+tint2 (15.1-1) unstable; urgency=medium
+
+  * New upstream bugfix
+   - Previous patch dropped (applied upstream)
+
+ -- Sebastian Reichel <sre@debian.org>  Fri, 08 Sep 2017 22:34:31 +0200
+
 tint2 (15.0-2) unstable; urgency=medium
 
   * Add patch to be compliant with POSIX.1-2001 and POSIX.1-2008 to
