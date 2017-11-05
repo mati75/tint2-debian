@@ -1,3 +1,9 @@
+tint2 (15.3-2) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Sebastian Reichel <sre@debian.org>  Sun, 05 Nov 2017 17:13:55 +0100
+
 tint2 (15.1-1) unstable; urgency=medium
 
   * New upstream bugfix
