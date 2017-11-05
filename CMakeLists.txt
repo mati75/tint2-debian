@@ -188,7 +188,6 @@ endif( ENABLE_SN)
 
 if( ENABLE_UEVENT )
   add_definitions( -DENABLE_UEVENT )
-  set( SOURCES ${SOURCES} src/util/uevent.c)
 endif( ENABLE_UEVENT )
 
 if(ENABLE_BACKTRACE)
@@ -274,7 +273,7 @@ set_target_properties( tint2 PROPERTIES LINK_FLAGS "-pthread -fno-strict-aliasin
 install( TARGETS tint2 DESTINATION bin )
 install( FILES tint2.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps )
 install( FILES tint2.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications )
-install( FILES themes/tint2rc DESTINATION /etc/xdg/tint2 )
+install( FILES themes/tint2rc DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/xdg/tint2 )
 install( FILES default_icon.png DESTINATION ${CMAKE_INSTALL_DATADIR}/tint2 )
 install( FILES AUTHORS ChangeLog README.md doc/tint2.md DESTINATION ${docdir} )
 install( FILES doc/manual.html doc/readme.html DESTINATION ${htmldir} )
