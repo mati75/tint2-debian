@@ -1,6 +1,7 @@
 tint2 (16.6.1-1) UNRELEASED; urgency=medium
 
   * Update watch file
+  * Update Debian Standards Version to 4.1.5
 
  -- Sebastian Reichel <sre@debian.org>  Wed, 08 Aug 2018 23:23:20 +0200
 
