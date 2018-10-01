@@ -1,3 +1,9 @@
+tint2 (16.6.1-2) UNRELEASED; urgency=medium
+
+  * d/changelog: Remove trailing whitespaces
+
+ -- Ondřej Nový <onovy@debian.org>  Mon, 01 Oct 2018 10:22:55 +0200
+
 tint2 (16.6.1-1) unstable; urgency=medium
 
   * Update watch file
@@ -191,7 +197,7 @@ tint2 (0.11+svn20111022-1) unstable; urgency=low
 
 tint2 (0.11+svn20111011-2) unstable; urgency=low
 
-  * build debug symbols 
+  * build debug symbols
 
  -- Sebastian Reichel <sre@debian.org>  Fri, 21 Oct 2011 16:30:50 +0200
 
@@ -215,7 +221,7 @@ tint2 (0.11+svn20110307-1) unstable; urgency=low
 
 tint2 (0.11-2) unstable; urgency=low
 
-  * Recommend python-gtk2 instead of python-gtk 
+  * Recommend python-gtk2 instead of python-gtk
 
  -- Sebastian Reichel <sre@debian.org>  Sun, 05 Dec 2010 05:05:46 +0100
 
