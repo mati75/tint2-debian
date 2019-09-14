@@ -1,4 +1,4 @@
-tint2 (16.7-1) UNRELEASED; urgency=medium
+tint2 (16.7-1) unstable; urgency=medium
 
   [ Ondřej Nový ]
   * d/changelog: Remove trailing whitespaces
@@ -8,7 +8,7 @@ tint2 (16.7-1) UNRELEASED; urgency=medium
   * Bump Debian compat version to 12
   * Update Debian Standards Version to 4.4.0
 
- -- Sebastian Reichel <sre@debian.org>  Sun, 15 Sep 2019 00:53:51 +0200
+ -- Sebastian Reichel <sre@debian.org>  Sun, 15 Sep 2019 01:16:43 +0200
 
 tint2 (16.6.1-1) unstable; urgency=medium
 
