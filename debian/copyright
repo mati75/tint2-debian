@@ -5,7 +5,9 @@ Files: *
 Copyright: 2007-2008 Pål Staurland <staura@gmail.com>
            2008-2009 Thierry Lorthiois <lorthiois@bbsoft.fr>
            2009 Andreas Fink <andreas.fink85@googlemail.com>
-           2011-2015 Ovidiu M <mrovi9000@gmail.com>
+           2011-2016 Ovidiu M <mrovi9000@gmail.com>
+           2016 Vladimir Kudrya
+           2017 tint2 authors
 License: GPL-2
 
 Files: src/battery/*
