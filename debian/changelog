@@ -6,6 +6,7 @@ tint2 (16.7-1) UNRELEASED; urgency=medium
   [ Sebastian Reichel ]
   * New upstream release
   * Bump Debian compat version to 12
+  * Update Debian Standards Version to 4.4.0
 
  -- Sebastian Reichel <sre@debian.org>  Sun, 15 Sep 2019 00:53:51 +0200
 
