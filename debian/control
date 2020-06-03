@@ -34,3 +34,23 @@ Description: lightweight taskbar
  .
  The goal is to keep a clean and unintrusive look with lightweight code and
  compliance with freedesktop specification.
+
+Package: tint2conf
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends}, tint2
+Breaks: tint2 (<< 16.7-1.1~)
+Conflicts: tint2 (<< 16.7-1.1~)
+Description: lightweight taskbar - GTK+ 2.0 configuration tool
+ Tint is a simple panel/taskbar intentionally made for openbox3, but should
+ also work with other window managers. The taskbar includes transparency and
+ color settings for the font, icons, border, and background. It also supports
+ multihead setups, customized mouse actions, and a built-in clock. Tint was
+ originally based on ttm code. Since then, support has also been added
+ for a battery monitor and system tray.
+ .
+ The goal is to keep a clean and unintrusive look with lightweight code and
+ compliance with freedesktop specification.
+ .
+ This package provides GTK+ 2.0 configuration tool.
+
